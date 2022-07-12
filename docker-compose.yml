@@ -10,3 +10,14 @@ services:
     volumes:
       - ./src/:/go/src
     tty: true
+  db:
+    image: mysql:8.0.21
+    platform: linux/x86_64
+    ports:
+      - '3317:3306'
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_USER: 'user'
+      MYSQL_PASSWORD: 'password'
+      MYSQL_ROOT_PASSWORD: 'pass'
+      MYSQL_DATABASE: 'go_mysql'

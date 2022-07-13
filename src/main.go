@@ -1,12 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
+	connect "github.com/hrs-o/docker-go/config"
+	"github.com/hrs-o/docker-go/router"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -15,36 +17,26 @@ import (
 func main() {
 
 	f, _ := os.Create("gin.log")
-	err := godotenv.Load(".env")
-
+	gin.DefaultWriter = io.MultiWriter(f, os.Stdout)
 	gin.DisableConsoleColor()
 
-	gin.DefaultWriter = io.MultiWriter(f, os.Stdout)
+	loadEnv()
 
-	DBUSER := os.Getenv("DB_USER")
-	PASSWORD := os.Getenv("PASSWORD")
-	HOST := os.Getenv("HOST")
-	PORTN := os.Getenv("PORTN")
-	DBNAME := os.Getenv("DBNAME")
+	dsn := connect.Dbconnect()
+	log.Printf("logです" + dsn)
 
-	dsn := DBUSER + ":" + PASSWORD + "@tcp(" + HOST + ":" + PORTN + ")/" + DBNAME + "?charset=utf8mb4&parseTime=True&loc=Local"
-	log.Printf(dsn)
-	_, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	_, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		panic(err.Error())
 	}
 
-	r := gin.Default()
-	r.LoadHTMLGlob("views/*")
-	r.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "index.html", gin.H{
-			"title": "Main website",
-		})
-	})
-	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"message": "pong",
-		})
-	})
-	r.Run() // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
+	router.Router()
+
+}
+
+func loadEnv() {
+	err := godotenv.Load(".env")
+	if err != nil {
+		fmt.Printf("読み込み出来ませんでした: %v", err)
+	}
 }

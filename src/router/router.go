@@ -7,6 +7,7 @@ import (
 
 func Router() {
 	r := gin.Default()
+	r.Static("/resources", "./resources")
 	r.LoadHTMLGlob("views/*")
 	r.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.html", gin.H{

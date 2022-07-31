@@ -1,5 +1,78 @@
-<html>
-	<h1>
-		{{ .title }}
-	</h1>
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta httpequiv="ContentType" content="text/html;charset=utf8">
+        <title id="test">{{ .title }}</title>
+		<link rel="stylesheet" href="../resources/app.css">
+    </head>
+    <body>
+		<div class="topnav">
+			<a class="active" href="#home">homepage</a>
+			<a href="#">Home</a>
+			<a href="#">Documentation</a>
+			<a href="#">Developer</a>
+		</div>
+		<div class="slideshow-container">
+			<div class="mySlides fade">
+				<div class="numbertext">1 / 4</div>
+				<img src="../resources/images/family.jpeg" style="width:100%">
+				<div class="text">Caption Text</div>
+			</div>
+			<div class="mySlides fade">
+				<div class="numbertext">2 / 4</div>
+				<img src="../resources/images/gifu.jpeg" style="width:100%">
+				<div class="text">Caption Text</div>
+			</div>
+			<div class="mySlides fade">
+				<div class="numbertext">3 / 4</div>
+				<img src="../resources/images/nagoyajyo.jpeg" style="width:100%">
+				<div class="text">Caption Text</div>
+			</div>
+			<div class="mySlides fade">
+				<div class="numbertext">4 / 4</div>
+				<img src="../resources/images/shirakawagou.jpeg" style="width:100%">
+				<div class="text">Caption Text</div>
+			</div>
+			<a class="prev" onclick="plusSlides(-1)">&#10094;</a>
+  			<a class="next" onclick="plusSlides(1)">&#10095;</a>
+		</div>
+		<div style="text-align:center">
+			<span class="dot" onclick="currentSlide(1)"></span>
+			<span class="dot" onclick="currentSlide(2)"></span>
+			<span class="dot" onclick="currentSlide(3)"></span>
+			<span class="dot" onclick="currentSlide(4)"></span>
+		</div>
+        <h1>{{ .title }}</h1>
+        <p><a href="#"></a><a href="#">編集</a> / <a href="#">削除</a></p>
+        <p><a href="/ping">新規作成</a></p>
+    </body>
 </html>
+
+<script>
+let slideIndex = 1;
+showSlides(slideIndex);
+
+function plusSlides(n) {
+  showSlides(slideIndex += n);
+}
+
+function currentSlide(n) {
+  showSlides(slideIndex = n);
+}
+
+function showSlides(n) {
+  let i;
+  let slides = document.getElementsByClassName("mySlides");
+  let dots = document.getElementsByClassName("dot");
+  if (n > slides.length) {slideIndex = 1}
+  if (n < 1) {slideIndex = slides.length}
+  for (i = 0; i < slides.length; i++) {
+    slides[i].style.display = "none";
+  }
+  for (i = 0; i < dots.length; i++) {
+    dots[i].className = dots[i].className.replace(" active", "");
+  }
+  slides[slideIndex-1].style.display = "block";
+  dots[slideIndex-1].className += " active";
+}
+</script>

@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
@@ -15,9 +15,9 @@ func Dbconnect() *gorm.DB {
 	PORTN := os.Getenv("PORTN")
 	DBNAME := os.Getenv("DBNAME")
 
-	dsn := DBUSER + ":" + PASSWORD + "@tcp(" + HOST + ":" + PORTN + ")/" + DBNAME + "?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "host=" + HOST + " user=" + DBUSER + " password=" + PASSWORD + " dbname=" + DBNAME + " port=" + PORTN + " sslmode=disable TimeZone=Asia/Tokyo"
 
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		panic(err.Error())
 	} else {

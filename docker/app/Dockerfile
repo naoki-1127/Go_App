@@ -1,16 +1,15 @@
-FROM golang:1.16-alpine
+FROM golang:1.26-alpine
 
 WORKDIR /go/src
-COPY ./src .
 
 RUN apk upgrade --update && \
     apk --no-cache add git
 
-RUN go get -u github.com/cosmtrek/air && \
-    go build -o /go/bin/air github.com/cosmtrek/air
+RUN go install github.com/air-verse/air@latest
 
-RUN go get -u github.com/jinzhu/gorm
-RUN go get -u github.com/go-sql-driver/mysql
-RUN go get -u github.com/joho/godotenv
+COPY ./src/go.mod ./src/go.sum ./
+RUN go mod download
+
+COPY ./src .
 
 CMD ["air", "-c", ".air.toml"]

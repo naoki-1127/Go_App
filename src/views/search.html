@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <title>会議室を探す | RoomBook</title>
+    {{ template "head" . }}
+  </head>
+  <body>
+    {{ template "icons" }}
+    {{ template "header" . }}
+
+    <div style="background: var(--navy); padding: 16px 0 36px"></div>
+    <div class="container">
+      <div class="overlap-wrap" style="margin-top: -30px">{{ template "searchbar" . }}</div>
+      <div data-demo-notice></div>
+
+      <nav class="breadcrumbs" aria-label="パンくずリスト">
+        <a href="/">ホーム</a><span aria-hidden="true">›</span>
+        <span id="crumb-location">すべての拠点</span><span aria-hidden="true">›</span>
+        <span>検索結果</span>
+      </nav>
+
+      <div class="layout-side">
+        <aside class="filters" aria-label="絞り込み">
+          <h2>絞り込み</h2>
+          <div class="filter-group">
+            <label class="check"><input type="checkbox" id="f-available" checked /> 空いている会議室のみ</label>
+          </div>
+          <div class="filter-group">
+            <h3>設備</h3>
+            <div id="f-equipment"></div>
+          </div>
+          <div class="filter-group">
+            <h3>料金(1時間あたり)</h3>
+            <input type="range" id="f-price" min="0" max="10000" step="500" value="10000" aria-describedby="f-price-out" />
+            <div id="f-price-out" class="range-out">上限なし</div>
+          </div>
+          <div class="filter-group">
+            <h3>収容人数</h3>
+            <label class="check"><input type="radio" name="f-cap" value="0" checked /> 指定なし</label>
+            <label class="check"><input type="radio" name="f-cap" value="1-4" /> 1〜4名</label>
+            <label class="check"><input type="radio" name="f-cap" value="5-10" /> 5〜10名</label>
+            <label class="check"><input type="radio" name="f-cap" value="11-9999" /> 11名以上</label>
+          </div>
+        </aside>
+
+        <section aria-live="polite">
+          <div class="result-head">
+            <h1 id="result-title">検索中…</h1>
+            <div class="sort-tabs" role="group" aria-label="並び替え">
+              <button type="button" data-sort="recommend" aria-pressed="true">おすすめ順</button>
+              <button type="button" data-sort="price" aria-pressed="false">料金が安い順</button>
+              <button type="button" data-sort="capacity" aria-pressed="false">人数が少ない順</button>
+            </div>
+          </div>
+          <p class="muted" id="result-cond" style="margin: -4px 0 16px"></p>
+          <div id="results">
+            <div class="skeleton" style="height: 200px; margin-bottom: 16px"></div>
+            <div class="skeleton" style="height: 200px; margin-bottom: 16px"></div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    {{ template "footer" . }}
+    {{ template "app_js" }}
+    <script>
+      (async function () {
+        const A = window.App;
+        const params = new URLSearchParams(location.search);
+        const form = document.querySelector("[data-searchbar]");
+        A.initSearchbar(form, [], params);
+
+        // URL に日時が無ければ検索バーの初期値を使う
+        const q = {
+          location_id: params.get("location_id") || "",
+          date: form.elements.date.value,
+          start: form.elements.start.value,
+          end: form.elements.end.value,
+          attendees: form.elements.attendees.value,
+        };
+        const query = new URLSearchParams(q).toString();
+
+        const [locations, equipment, rooms] = await Promise.all([
+          A.load("/api/locations", A.SAMPLE.locations),
+          A.load("/api/equipment", A.SAMPLE.equipment),
+          A.load("/api/rooms/search?" + query, function () { return A.SAMPLE.search(q); }),
+        ]);
+        A.initSearchbar(form, locations, new URLSearchParams(query));
+
+        const locById = {};
+        locations.forEach(function (l) { locById[l.id] = l; });
+        const selectedLoc = locById[q.location_id];
+        document.getElementById("crumb-location").textContent = selectedLoc ? selectedLoc.name : "すべての拠点";
+
+        const hours = A.hours(q.start, q.end);
+        document.getElementById("result-cond").textContent =
+          A.fmtDate(q.date) + " " + q.start + "〜" + q.end + "(" + hours + "時間)・" + q.attendees + "名";
+
+        // 設備フィルター(件数つき)
+        const eqCount = {};
+        rooms.forEach(function (r) {
+          (r.equipment || []).forEach(function (e) { eqCount[e.id] = (eqCount[e.id] || 0) + 1; });
+        });
+        document.getElementById("f-equipment").innerHTML = equipment.map(function (e) {
+          return '<label class="check"><input type="checkbox" value="' + A.esc(e.id) + '" /> ' + A.esc(e.name) +
+            '<span class="count">' + (eqCount[e.id] || 0) + "</span></label>";
+        }).join("") || '<span class="muted">設備が登録されていません</span>';
+
+        const maxPrice = Math.max(1000, ...rooms.map(function (r) { return r.hourly_price; }));
+        const priceInput = document.getElementById("f-price");
+        priceInput.max = String(Math.ceil(maxPrice / 500) * 500);
+        priceInput.value = priceInput.max;
+
+        let sortKey = "recommend";
+
+        function render() {
+          const onlyAvailable = document.getElementById("f-available").checked;
+          const eqIds = Array.from(document.querySelectorAll("#f-equipment input:checked")).map(function (i) { return i.value; });
+          const priceMax = Number(priceInput.value);
+          const priceIsMax = priceInput.value === priceInput.max;
+          document.getElementById("f-price-out").textContent = priceIsMax ? "上限なし" : A.yen(priceMax) + " まで";
+          const cap = document.querySelector("input[name=f-cap]:checked").value;
+          const capRange = cap === "0" ? null : cap.split("-").map(Number);
+
+          let list = rooms.filter(function (r) {
+            if (onlyAvailable && r.available === false) return false;
+            if (!priceIsMax && r.hourly_price > priceMax) return false;
+            if (capRange && (r.capacity < capRange[0] || r.capacity > capRange[1])) return false;
+            const has = (r.equipment || []).map(function (e) { return e.id; });
+            return eqIds.every(function (id) { return has.includes(id); });
+          });
+
+          list = list.slice().sort(function (a, b) {
+            if (sortKey === "price") return a.hourly_price - b.hourly_price;
+            if (sortKey === "capacity") return a.capacity - b.capacity;
+            // おすすめ: 空きあり → 人数がちょうど良い順
+            return (b.available !== false) - (a.available !== false) ||
+              Math.abs(a.capacity - q.attendees) - Math.abs(b.capacity - q.attendees);
+          });
+
+          document.getElementById("result-title").textContent =
+            (selectedLoc ? selectedLoc.name + ":" : "") + list.length + "件の会議室が見つかりました";
+
+          const detailQuery = "?date=" + encodeURIComponent(q.date) + "&start=" + encodeURIComponent(q.start) +
+            "&end=" + encodeURIComponent(q.end) + "&attendees=" + encodeURIComponent(q.attendees);
+
+          const results = document.getElementById("results");
+          if (!list.length) {
+            results.innerHTML = '<div class="empty"><h2>条件に合う会議室がありません</h2>' +
+              "<p>日時や人数、絞り込み条件を変えてもう一度お試しください。</p></div>";
+            return;
+          }
+          results.innerHTML = list.map(function (r) {
+            const loc = r.location || locById[r.location_id] || {};
+            const url = "/rooms/" + encodeURIComponent(r.id) + detailQuery;
+            const tags = (r.equipment || []).map(function (e) { return '<span class="tag">' + A.esc(e.name) + "</span>"; }).join("");
+            const fit = r.capacity >= q.attendees
+              ? '<span class="ok-text">' + A.icon("i-check", "icon-sm") + " " + q.attendees + "名で利用できます</span>"
+              : '<span class="ng-text">' + A.icon("i-x", "icon-sm") + " 定員を超えています</span>";
+            const avail = r.available === false
+              ? '<span class="ng-text">' + A.icon("i-x", "icon-sm") + " この時間は予約済みです</span>"
+              : '<span class="ok-text">' + A.icon("i-check", "icon-sm") + " この時間は空いています</span>";
+            return '<article class="room-card">' +
+              '<a href="' + url + '" tabindex="-1" aria-hidden="true">' + A.thumb(r.id) + "</a>" +
+              '<div class="info">' +
+              '<h2><a href="' + url + '">' + A.esc(r.name) + "</a></h2>" +
+              '<div class="loc"><a href="/search?location_id=' + encodeURIComponent(loc.id || "") + '">' + A.esc(loc.name || "") + "</a>" +
+              '<span class="muted">' + A.esc(loc.address || "") + "</span></div>" +
+              '<div class="meta"><span>' + A.icon("i-people", "icon-sm") + " 最大 " + r.capacity + "名</span>" +
+              "<span>" + A.icon("i-clock", "icon-sm") + " " + A.esc(loc.open_time || "") + "〜" + A.esc(loc.close_time || "") + "</span></div>" +
+              '<div class="tags">' + tags + "</div>" +
+              avail + fit +
+              "</div>" +
+              '<div class="aside">' +
+              '<div class="top"><div>' + (r.available === false ? '<strong class="ng-text">満室</strong>' : '<strong class="ok-text">予約可</strong>') + "<small>" +
+              A.esc(q.start) + "〜" + A.esc(q.end) + "</small></div></div>" +
+              "<div>" +
+              '<div class="price-note">' + hours + "時間の料金</div>" +
+              '<div class="price-big">' + A.yen(r.hourly_price * hours) + "</div>" +
+              '<div class="price-note">' + A.yen(r.hourly_price) + " / 1時間</div>" +
+              "</div>" +
+              '<a class="btn btn-primary" href="' + url + '">空き状況を確認 ›</a>' +
+              "</div></article>";
+          }).join("");
+        }
+
+        document.querySelector(".filters").addEventListener("input", render);
+        document.querySelectorAll("[data-sort]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            sortKey = btn.dataset.sort;
+            document.querySelectorAll("[data-sort]").forEach(function (b) {
+              b.setAttribute("aria-pressed", String(b === btn));
+            });
+            render();
+          });
+        });
+        render();
+      })();
+    </script>
+  </body>
+</html>

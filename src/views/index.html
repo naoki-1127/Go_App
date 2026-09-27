@@ -1,78 +1,127 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
-    <head>
-        <meta httpequiv="ContentType" content="text/html;charset=utf8">
-        <title id="test">{{ .title }}</title>
-		<link rel="stylesheet" href="../resources/app.css">
-    </head>
-    <body>
-		<div class="topnav">
-			<a class="active" href="#home">homepage</a>
-			<a href="#">Home</a>
-			<a href="#">Documentation</a>
-			<a href="#">Developer</a>
-		</div>
-		<div class="slideshow-container">
-			<div class="mySlides fade">
-				<div class="numbertext">1 / 4</div>
-				<img src="../resources/images/family.jpeg" style="width:100%">
-				<div class="text">Caption Text</div>
-			</div>
-			<div class="mySlides fade">
-				<div class="numbertext">2 / 4</div>
-				<img src="../resources/images/gifu.jpeg" style="width:100%">
-				<div class="text">Caption Text</div>
-			</div>
-			<div class="mySlides fade">
-				<div class="numbertext">3 / 4</div>
-				<img src="../resources/images/nagoyajyo.jpeg" style="width:100%">
-				<div class="text">Caption Text</div>
-			</div>
-			<div class="mySlides fade">
-				<div class="numbertext">4 / 4</div>
-				<img src="../resources/images/shirakawagou.jpeg" style="width:100%">
-				<div class="text">Caption Text</div>
-			</div>
-			<a class="prev" onclick="plusSlides(-1)">&#10094;</a>
-  			<a class="next" onclick="plusSlides(1)">&#10095;</a>
-		</div>
-		<div style="text-align:center">
-			<span class="dot" onclick="currentSlide(1)"></span>
-			<span class="dot" onclick="currentSlide(2)"></span>
-			<span class="dot" onclick="currentSlide(3)"></span>
-			<span class="dot" onclick="currentSlide(4)"></span>
-		</div>
-        <h1>{{ .title }}</h1>
-        <p><a href="#"></a><a href="#">編集</a> / <a href="#">削除</a></p>
-        <p><a href="/ping">新規作成</a></p>
-    </body>
+  <head>
+    <title>RoomBook | 会議室予約</title>
+    {{ template "head" . }}
+  </head>
+  <body>
+    {{ template "icons" }}
+    {{ template "header" . }}
+
+    <section class="hero">
+      <div class="container">
+        <h1>会議室を、すぐに予約。</h1>
+        <p>拠点・日時・人数を入れるだけで、空いている会議室が見つかります。</p>
+      </div>
+    </section>
+
+    <div class="container">
+      {{ template "searchbar" . }}
+      <div data-demo-notice></div>
+    </div>
+
+    <main>
+      <section class="section">
+        <div class="container">
+          <h2 class="section-title">拠点から探す</h2>
+          <p class="section-sub">各拠点の会議室をまとめて確認できます</p>
+          <div class="grid grid-3" id="location-list">
+            <div class="skeleton" style="height: 220px"></div>
+            <div class="skeleton" style="height: 220px"></div>
+            <div class="skeleton" style="height: 220px"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" style="background: var(--bg-alt)">
+        <div class="container">
+          <h2 class="section-title">人気の会議室</h2>
+          <p class="section-sub">よく使われている会議室</p>
+          <div class="grid grid-4" id="room-list">
+            <div class="skeleton" style="height: 260px"></div>
+            <div class="skeleton" style="height: 260px"></div>
+            <div class="skeleton" style="height: 260px"></div>
+            <div class="skeleton" style="height: 260px"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="container">
+          <h2 class="section-title">ご利用の流れ</h2>
+          <p class="section-sub">仮押さえから確定まで、数クリックで完了します</p>
+          <div class="grid grid-3 steps">
+            <div class="step">
+              <span class="num">1</span>
+              <div>
+                <h3>空き会議室を検索</h3>
+                <p>拠点・日時・人数から、その時間に使える会議室だけを表示します。</p>
+              </div>
+            </div>
+            <div class="step">
+              <span class="num">2</span>
+              <div>
+                <h3>仮押さえ</h3>
+                <p>時間帯を選ぶと仮押さえされます。期限内であれば他の人に取られません。</p>
+              </div>
+            </div>
+            <div class="step">
+              <span class="num">3</span>
+              <div>
+                <h3>予約を確定</h3>
+                <p>内容を確認して確定します。予約一覧からいつでもキャンセルできます。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    {{ template "footer" . }}
+    {{ template "app_js" }}
+    <script>
+      (async function () {
+        const A = window.App;
+        const params = new URLSearchParams(location.search);
+        const form = document.querySelector("[data-searchbar]");
+        A.initSearchbar(form, [], params);
+
+        const [locations, rooms] = await Promise.all([
+          A.load("/api/locations", A.SAMPLE.locations),
+          A.load("/api/rooms/search", function () { return A.SAMPLE.search({}); }),
+        ]);
+        A.initSearchbar(form, locations, params);
+
+        const countByLocation = {};
+        rooms.forEach(function (r) {
+          countByLocation[r.location_id] = (countByLocation[r.location_id] || 0) + 1;
+        });
+
+        const locList = document.getElementById("location-list");
+        locList.innerHTML = locations.length
+          ? locations.map(function (l) {
+              const n = countByLocation[l.id] || 0;
+              return '<a class="location-card" href="/search?location_id=' + encodeURIComponent(l.id) + '">' +
+                A.thumb(l.id, null, "i-building") +
+                '<div class="body"><h3>' + A.esc(l.name) + "</h3>" +
+                "<p>" + A.esc(l.address || "住所未登録") + "</p>" +
+                "<p>会議室 " + n + "室 ・ " + A.esc(l.open_time) + "〜" + A.esc(l.close_time) + "</p></div></a>";
+            }).join("")
+          : '<div class="empty" style="grid-column: 1 / -1"><h2>拠点が登録されていません</h2></div>';
+
+        const popular = rooms.slice().sort(function (a, b) { return b.capacity - a.capacity; }).slice(0, 4);
+        const roomList = document.getElementById("room-list");
+        roomList.innerHTML = popular.length
+          ? popular.map(function (r) {
+              const loc = r.location || locations.find(function (l) { return l.id === r.location_id; }) || {};
+              return '<a class="mini-card" href="/rooms/' + encodeURIComponent(r.id) + '">' +
+                A.thumb(r.id, loc.name) +
+                '<div class="body"><h3>' + A.esc(r.name) + "</h3>" +
+                '<span class="muted">' + A.icon("i-people", "icon-sm") + " 最大 " + r.capacity + "名</span>" +
+                '<div class="price">' + A.yen(r.hourly_price) + " <small>/ 1時間</small></div></div></a>";
+            }).join("")
+          : '<div class="empty" style="grid-column: 1 / -1"><h2>会議室が登録されていません</h2></div>';
+      })();
+    </script>
+  </body>
 </html>
-
-<script>
-let slideIndex = 1;
-showSlides(slideIndex);
-
-function plusSlides(n) {
-  showSlides(slideIndex += n);
-}
-
-function currentSlide(n) {
-  showSlides(slideIndex = n);
-}
-
-function showSlides(n) {
-  let i;
-  let slides = document.getElementsByClassName("mySlides");
-  let dots = document.getElementsByClassName("dot");
-  if (n > slides.length) {slideIndex = 1}
-  if (n < 1) {slideIndex = slides.length}
-  for (i = 0; i < slides.length; i++) {
-    slides[i].style.display = "none";
-  }
-  for (i = 0; i < dots.length; i++) {
-    dots[i].className = dots[i].className.replace(" active", "");
-  }
-  slides[slideIndex-1].style.display = "block";
-  dots[slideIndex-1].className += " active";
-}
-</script>

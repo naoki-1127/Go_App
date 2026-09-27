@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <title>会議室の詳細 | RoomBook</title>
+    {{ template "head" . }}
+  </head>
+  <body>
+    {{ template "icons" }}
+    {{ template "header" . }}
+
+    {{/* 会議室IDは .roomID で渡すか、URL の /rooms/:id または ?id= から取得する */}}
+    <main class="container" id="room-page" data-room-id="{{ .roomID }}">
+      <div data-demo-notice></div>
+      <nav class="breadcrumbs" aria-label="パンくずリスト">
+        <a href="/">ホーム</a><span aria-hidden="true">›</span>
+        <a href="/search" id="crumb-location">拠点</a><span aria-hidden="true">›</span>
+        <span id="crumb-room">会議室</span>
+      </nav>
+
+      <div class="room-head">
+        <div>
+          <h1 id="room-name"><span class="skeleton" style="display: inline-block; width: 240px; height: 32px"></span></h1>
+          <div class="addr"><svg class="icon icon-sm" style="color: var(--blue)"><use href="#i-pin"/></svg><span id="room-address"></span></div>
+        </div>
+        <a class="btn btn-primary btn-lg" href="#booking">予約へ進む</a>
+      </div>
+
+      <div class="gallery" id="gallery"></div>
+
+      <div class="room-layout">
+        <div>
+          <div class="facts" id="facts"></div>
+
+          <section class="panel" aria-labelledby="avail-title">
+            <h2 id="avail-title">空き状況</h2>
+            <div class="date-nav">
+              <button type="button" class="btn btn-outline" id="prev-day" aria-label="前の日">‹</button>
+              <input type="date" class="input" id="avail-date" aria-label="日付" />
+              <button type="button" class="btn btn-outline" id="next-day" aria-label="次の日">›</button>
+              <span class="muted" id="avail-label"></span>
+            </div>
+            <div class="timeline-wrap">
+              <div class="timeline" id="timeline" role="group" aria-label="時間帯(30分単位)"></div>
+              <div class="timeline-labels" id="timeline-labels" aria-hidden="true"></div>
+            </div>
+            <div class="legend">
+              <span><i style="background: var(--green-bg)"></i>空き</span>
+              <span><i style="background: #e4e4e4"></i>予約済み</span>
+              <span><i style="background: var(--blue)"></i>選択中</span>
+              <span>空き枠をクリックで開始時刻、続けて後ろの枠をクリックで終了時刻を選べます</span>
+            </div>
+          </section>
+
+          <section class="panel" aria-labelledby="equip-title">
+            <h2 id="equip-title">設備</h2>
+            <ul class="equip-list" id="equip-list"></ul>
+          </section>
+
+          <section class="panel" aria-labelledby="rule-title">
+            <h2 id="rule-title">ご利用にあたって</h2>
+            <ul style="margin: 0; padding-left: 20px; color: var(--muted)">
+              <li>予約は30分単位です。営業時間内でご利用ください。</li>
+              <li>「仮押さえ」後、期限内に確定しないと自動的に解除されます。</li>
+              <li>キャンセルは「予約一覧」からいつでも行えます。</li>
+            </ul>
+          </section>
+        </div>
+
+        <aside class="booking-panel" id="booking" aria-labelledby="bp-title">
+          <div class="bp-head">
+            <div class="muted" style="font-size: 13px">1時間あたり</div>
+            <strong id="bp-price">-</strong>
+          </div>
+          <form id="booking-form" novalidate>
+            <h2 id="bp-title" class="visually-hidden">予約内容</h2>
+            <label class="form-field"><span>利用日</span><input class="input" type="date" name="date" required /></label>
+            <div class="form-row">
+              <label class="form-field"><span>開始</span><select class="select" name="start"></select></label>
+              <label class="form-field"><span>終了</span><select class="select" name="end"></select></label>
+            </div>
+            <label class="form-field">
+              <span>人数</span>
+              <input class="input" type="number" name="attendees" min="1" value="1" required />
+              <span class="form-hint" id="cap-hint"></span>
+            </label>
+            <label class="form-field">
+              <span>会議名</span>
+              <input class="input" type="text" name="title" maxlength="100" placeholder="例: 週次定例" required />
+            </label>
+            <div class="summary" id="summary"></div>
+            <p class="form-error" id="form-error" role="alert" hidden></p>
+            <button class="btn btn-primary btn-lg btn-block" type="submit" id="hold-btn">仮押さえする</button>
+            <p class="form-hint" style="margin: 0; text-align: center">この時点ではまだ予約は確定しません</p>
+          </form>
+        </aside>
+      </div>
+    </main>
+
+    {{ template "footer" . }}
+    {{ template "app_js" }}
+    <script>
+      (async function () {
+        const A = window.App;
+        const page = document.getElementById("room-page");
+        const params = new URLSearchParams(location.search);
+        const pathId = location.pathname.match(/\/rooms\/([^/]+)/);
+        const roomId = page.dataset.roomId || params.get("id") || (pathId ? decodeURIComponent(pathId[1]) : "");
+
+        const room = await A.load("/api/rooms/" + encodeURIComponent(roomId), function () {
+          return A.SAMPLE.rooms.find(function (r) { return r.id === roomId; }) || A.SAMPLE.rooms[1];
+        });
+        const loc = room.location || A.SAMPLE.locations.find(function (l) { return l.id === room.location_id; }) || {};
+        const open = (loc.open_time || "08:00").slice(0, 5);
+        const close = (loc.close_time || "22:00").slice(0, 5);
+        const SLOT = 30;
+        const slotCount = (A.toMin(close) - A.toMin(open)) / SLOT;
+
+        // ---------- 基本情報 ----------
+        document.title = room.name + " | RoomBook";
+        document.getElementById("room-name").textContent = room.name;
+        document.getElementById("crumb-room").textContent = room.name;
+        const crumbLoc = document.getElementById("crumb-location");
+        crumbLoc.textContent = loc.name || "拠点";
+        crumbLoc.href = "/search?location_id=" + encodeURIComponent(loc.id || "");
+        document.getElementById("room-address").textContent = (loc.name || "") + " ・ " + (loc.address || "住所未登録");
+        document.getElementById("gallery").innerHTML =
+          A.thumb(room.id, room.name) + A.thumb(room.id + "a", null, "i-screen") + A.thumb(room.id + "b", null, "i-people") +
+          A.thumb(room.id + "c", null, "i-building") + A.thumb(room.id + "d", null, "i-calendar");
+        document.getElementById("facts").innerHTML =
+          '<div class="fact">' + A.icon("i-people") + "<div><small>収容人数</small><strong>最大 " + room.capacity + "名</strong></div></div>" +
+          '<div class="fact">' + A.icon("i-yen") + "<div><small>料金</small><strong>" + A.yen(room.hourly_price) + " / 時間</strong></div></div>" +
+          '<div class="fact">' + A.icon("i-clock") + "<div><small>利用可能時間</small><strong>" + A.esc(open) + "〜" + A.esc(close) + "</strong></div></div>";
+        const eq = room.equipment || [];
+        document.getElementById("equip-list").innerHTML = eq.length
+          ? eq.map(function (e) { return "<li>" + A.icon("i-check") + A.esc(e.name) + "</li>"; }).join("")
+          : '<li class="muted">登録されている設備はありません</li>';
+        document.getElementById("bp-price").textContent = A.yen(room.hourly_price);
+        document.getElementById("cap-hint").textContent = "この会議室の定員は " + room.capacity + " 名です";
+
+        if (room.is_active === false) {
+          const n = document.createElement("div");
+          n.className = "notice error";
+          n.textContent = "この会議室は現在ご利用いただけません。";
+          document.querySelector("[data-demo-notice]").appendChild(n);
+          document.getElementById("hold-btn").disabled = true;
+        }
+
+        // ---------- 状態 ----------
+        const form = document.getElementById("booking-form");
+        const def = A.defaultSlot();
+        const state = {
+          date: params.get("date") || def.date,
+          selStart: null, // スロット番号
+          selEnd: null,   // スロット番号(この番号の直前まで)
+          booked: [],     // 予約済みスロット番号の配列
+        };
+        form.elements.attendees.value = params.get("attendees") || "1";
+        form.elements.attendees.max = String(room.capacity);
+        form.elements.start.innerHTML = A.timeOptions(open, A.fromMin(A.toMin(close) - SLOT));
+        form.elements.end.innerHTML = A.timeOptions(A.fromMin(A.toMin(open) + SLOT), close);
+
+        function slotOf(time) { return (A.toMin(time) - A.toMin(open)) / SLOT; }
+        function timeOf(slot) { return A.fromMin(A.toMin(open) + slot * SLOT); }
+        function isPast(slot) {
+          if (state.date !== A.today()) return state.date < A.today();
+          const now = new Date();
+          return A.toMin(timeOf(slot)) + SLOT <= now.getHours() * 60 + now.getMinutes();
+        }
+        function rangeFree(from, to) {
+          for (let s = from; s < to; s++) {
+            if (state.booked.includes(s) || isPast(s)) return false;
+          }
+          return true;
+        }
+
+        // 初期選択(URL の時間帯を優先)
+        const qs = params.get("start"), qe = params.get("end");
+        if (qs && qe && slotOf(qs) >= 0 && slotOf(qe) <= slotCount && slotOf(qe) > slotOf(qs)) {
+          state.selStart = slotOf(qs);
+          state.selEnd = slotOf(qe);
+        }
+
+        // ---------- 空き状況 ----------
+        async function loadAvailability() {
+          const list = await A.load(
+            "/api/rooms/" + encodeURIComponent(room.id) + "/availability?date=" + state.date,
+            function () { return A.SAMPLE.bookedFor(room.id, state.date); }
+          );
+          const booked = [];
+          list.forEach(function (b) {
+            const s = new Date(b.start_at), e = new Date(b.end_at);
+            if (A.ymd(s) !== state.date) return;
+            const from = Math.max(0, Math.floor(slotOf(A.hm(s))));
+            const to = Math.min(slotCount, Math.ceil(slotOf(A.hm(e))));
+            for (let i = from; i < to; i++) booked.push(i);
+          });
+          state.booked = booked;
+          if (state.selStart != null && !rangeFree(state.selStart, state.selEnd)) {
+            state.selStart = state.selEnd = null;
+          }
+          render();
+        }
+
+        function render() {
+          document.getElementById("avail-date").value = state.date;
+          document.getElementById("avail-date").min = A.today();
+          document.getElementById("avail-label").textContent = A.fmtDate(state.date);
+          document.getElementById("prev-day").disabled = state.date <= A.today();
+          form.elements.date.value = state.date;
+          form.elements.date.min = A.today();
+
+          let html = "", labels = "";
+          for (let s = 0; s < slotCount; s++) {
+            const t = timeOf(s);
+            const booked = state.booked.includes(s);
+            const past = isPast(s);
+            const selected = state.selStart != null && s >= state.selStart && s < state.selEnd;
+            const cls = "slot" + (booked ? " booked" : past ? " past" : "") + (selected ? " selected" : "");
+            const label = t + "〜" + timeOf(s + 1) + " " + (booked ? "予約済み" : past ? "受付終了" : selected ? "選択中" : "空き");
+            html += '<button type="button" class="' + cls + '" data-slot="' + s + '" title="' + label + '" aria-label="' + label + '"' +
+              (booked || past ? " disabled" : "") + (selected ? ' aria-pressed="true"' : "") + "></button>";
+            labels += "<span>" + (s % 2 === 0 ? t.replace(/:00$/, "") : "") + "</span>";
+          }
+          document.getElementById("timeline").innerHTML = html;
+          document.getElementById("timeline-labels").innerHTML = labels;
+
+          if (state.selStart != null) {
+            form.elements.start.value = timeOf(state.selStart);
+            form.elements.end.value = timeOf(state.selEnd);
+          }
+          renderSummary();
+        }
+
+        function renderSummary() {
+          const start = form.elements.start.value, end = form.elements.end.value;
+          const h = A.hours(start, end);
+          const box = document.getElementById("summary");
+          if (h <= 0) {
+            box.innerHTML = '<div class="muted">時間帯を選択してください</div>';
+            return;
+          }
+          box.innerHTML =
+            "<div><span>" + A.esc(A.fmtDate(state.date)) + "</span><span>" + A.esc(start) + "〜" + A.esc(end) + "</span></div>" +
+            "<div><span>" + A.yen(room.hourly_price) + " × " + h + "時間</span><span>" + A.yen(room.hourly_price * h) + "</span></div>" +
+            '<div class="total"><span>合計</span><span>' + A.yen(room.hourly_price * h) + "</span></div>";
+        }
+
+        document.getElementById("timeline").addEventListener("click", function (e) {
+          const btn = e.target.closest("[data-slot]");
+          if (!btn || btn.disabled) return;
+          const s = Number(btn.dataset.slot);
+          // 1枠だけ選択中に後ろの枠を押したら、そこまで範囲を広げる
+          if (state.selStart != null && state.selEnd === state.selStart + 1 && s > state.selStart && rangeFree(state.selStart, s + 1)) {
+            state.selEnd = s + 1;
+          } else {
+            state.selStart = s;
+            state.selEnd = s + 1;
+          }
+          render();
+        });
+
+        function changeDate(date) {
+          if (!date || date < A.today()) return;
+          state.date = date;
+          loadAvailability();
+        }
+        document.getElementById("prev-day").addEventListener("click", function () { changeDate(A.addDays(state.date, -1)); });
+        document.getElementById("next-day").addEventListener("click", function () { changeDate(A.addDays(state.date, 1)); });
+        document.getElementById("avail-date").addEventListener("change", function (e) { changeDate(e.target.value); });
+        form.elements.date.addEventListener("change", function (e) { changeDate(e.target.value); });
+
+        function onTimeSelect() {
+          const s = slotOf(form.elements.start.value);
+          let en = slotOf(form.elements.end.value);
+          if (en <= s) {
+            en = Math.min(s + 2, slotCount);
+            form.elements.end.value = timeOf(en);
+          }
+          state.selStart = s;
+          state.selEnd = en;
+          render();
+        }
+        form.elements.start.addEventListener("change", onTimeSelect);
+        form.elements.end.addEventListener("change", onTimeSelect);
+
+        // ---------- 仮押さえ → 確定 ----------
+        let idempotencyKey = A.uuid();
+        form.addEventListener("input", function (e) {
+          if (e.target.name !== "title") idempotencyKey = A.uuid();
+        });
+
+        function showError(msg) {
+          const el = document.getElementById("form-error");
+          el.textContent = msg;
+          el.hidden = !msg;
+        }
+
+        form.addEventListener("submit", async function (e) {
+          e.preventDefault();
+          showError("");
+          const start = form.elements.start.value, end = form.elements.end.value;
+          const attendees = Number(form.elements.attendees.value);
+          const title = form.elements.title.value.trim();
+          if (A.toMin(end) <= A.toMin(start)) return showError("終了時刻は開始時刻より後にしてください。");
+          if (!rangeFree(slotOf(start), slotOf(end))) return showError("選択した時間帯には予約済み、または受付終了の枠が含まれています。");
+          if (!attendees || attendees < 1) return showError("人数を入力してください。");
+          if (attendees > room.capacity) return showError("人数が定員(" + room.capacity + "名)を超えています。");
+          if (!title) { form.elements.title.focus(); return showError("会議名を入力してください。"); }
+
+          const btn = document.getElementById("hold-btn");
+          btn.disabled = true;
+          btn.textContent = "仮押さえ中…";
+          const body = {
+            room_id: room.id, title: title, attendees: attendees,
+            start_at: A.iso(state.date, start), end_at: A.iso(state.date, end),
+          };
+          try {
+            const resv = await A.send("/api/reservations", "POST", body, function () {
+              return Object.assign({ id: A.uuid(), status: "HELD", hold_expires_at: new Date(Date.now() + 10 * 60000).toISOString() }, body);
+            }, { "Idempotency-Key": idempotencyKey });
+            openHoldModal(Object.assign({}, body, resv));
+          } catch (err) {
+            if (err.status === 401) {
+              showError("予約するにはログインが必要です。");
+              A.toast("ログインしてください", "error");
+            } else if (err.status === 409) {
+              showError("この時間帯は他の予約と重なっています。別の時間を選んでください。");
+              loadAvailability();
+            } else {
+              showError(err.message);
+            }
+          } finally {
+            btn.disabled = false;
+            btn.textContent = "仮押さえする";
+          }
+        });
+
+        function openHoldModal(resv) {
+          const expires = resv.hold_expires_at ? new Date(resv.hold_expires_at) : new Date(Date.now() + 10 * 60000);
+          const m = A.modal({
+            title: "仮押さえしました",
+            dismissible: false,
+            body:
+              '<p style="margin:0">以下の内容で仮押さえ中です。期限内に確定してください。</p>' +
+              '<div><div class="muted" style="text-align:center;font-size:13px">確定までの残り時間</div><div class="countdown" data-countdown>--:--</div></div>' +
+              '<dl class="kv">' +
+              "<dt>会議室</dt><dd>" + A.esc(room.name) + "</dd>" +
+              "<dt>拠点</dt><dd>" + A.esc(loc.name || "") + "</dd>" +
+              "<dt>日時</dt><dd>" + A.esc(A.fmtRange(resv.start_at, resv.end_at)) + "</dd>" +
+              "<dt>会議名</dt><dd>" + A.esc(resv.title) + "</dd>" +
+              "<dt>人数</dt><dd>" + A.esc(resv.attendees) + "名</dd>" +
+              "<dt>料金</dt><dd>" + A.yen(room.hourly_price * A.hours(A.hm(new Date(resv.start_at)), A.hm(new Date(resv.end_at)))) + "</dd>" +
+              "</dl>" +
+              '<p class="form-error" data-error hidden></p>',
+            foot:
+              '<button type="button" class="btn btn-danger" data-cancel>仮押さえを取り消す</button>' +
+              '<button type="button" class="btn btn-primary" data-confirm>予約を確定する</button>',
+          });
+          const cd = m.el.querySelector("[data-countdown]");
+          const confirmBtn = m.el.querySelector("[data-confirm]");
+          const errEl = m.el.querySelector("[data-error]");
+          function tick() {
+            const left = Math.max(0, Math.floor((expires - Date.now()) / 1000));
+            cd.textContent = A.pad(Math.floor(left / 60)) + ":" + A.pad(left % 60);
+            if (left === 0) {
+              clearInterval(timer);
+              confirmBtn.disabled = true;
+              errEl.textContent = "仮押さえの期限が切れました。もう一度予約してください。";
+              errEl.hidden = false;
+            }
+          }
+          const timer = setInterval(tick, 1000);
+          tick();
+
+          confirmBtn.addEventListener("click", async function () {
+            confirmBtn.disabled = true;
+            try {
+              await A.send("/api/reservations/" + encodeURIComponent(resv.id) + "/confirm", "POST", {}, function () {
+                return { id: resv.id, status: "CONFIRMED" };
+              });
+              clearInterval(timer);
+              m.close();
+              idempotencyKey = A.uuid();
+              form.elements.title.value = "";
+              state.selStart = state.selEnd = null;
+              openDoneModal(resv);
+              loadAvailability();
+            } catch (err) {
+              errEl.textContent = err.message;
+              errEl.hidden = false;
+              confirmBtn.disabled = false;
+            }
+          });
+
+          m.el.querySelector("[data-cancel]").addEventListener("click", async function () {
+            try {
+              await A.send("/api/reservations/" + encodeURIComponent(resv.id) + "/cancel", "POST", {}, function () {
+                return { id: resv.id, status: "CANCELLED" };
+              });
+            } catch (err) {
+              A.toast(err.message, "error");
+              return;
+            }
+            clearInterval(timer);
+            m.close();
+            idempotencyKey = A.uuid();
+            A.toast("仮押さえを取り消しました");
+          });
+        }
+
+        function openDoneModal(resv) {
+          A.modal({
+            title: "予約が確定しました",
+            body:
+              '<div class="result-icon">' + A.icon("i-check") + "</div>" +
+              '<p style="margin:0;text-align:center"><strong>' + A.esc(room.name) + "</strong><br>" +
+              A.esc(A.fmtRange(resv.start_at, resv.end_at)) + "</p>",
+            foot:
+              '<button type="button" class="btn btn-outline" data-close>閉じる</button>' +
+              '<a class="btn btn-primary" href="/reservations">予約一覧を見る</a>',
+          });
+        }
+
+        loadAvailability();
+      })();
+    </script>
+  </body>
+</html>

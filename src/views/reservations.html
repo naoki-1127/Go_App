@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <title>予約一覧 | RoomBook</title>
+    {{ template "head" . }}
+  </head>
+  <body>
+    {{ template "icons" }}
+    {{ template "header" . }}
+
+    <main class="container" style="padding-bottom: 48px">
+      <div data-demo-notice></div>
+      <h1 class="page-title">予約一覧</h1>
+
+      <div class="tabs" role="tablist" aria-label="予約の種類">
+        <button type="button" role="tab" data-tab="upcoming" aria-selected="true">今後の予約<span class="count" data-count="upcoming">0</span></button>
+        <button type="button" role="tab" data-tab="past" aria-selected="false">過去の予約<span class="count" data-count="past">0</span></button>
+        <button type="button" role="tab" data-tab="cancelled" aria-selected="false">キャンセル・期限切れ<span class="count" data-count="cancelled">0</span></button>
+      </div>
+
+      <div id="list" role="tabpanel">
+        <div class="skeleton" style="height: 140px; margin-bottom: 12px"></div>
+        <div class="skeleton" style="height: 140px; margin-bottom: 12px"></div>
+      </div>
+    </main>
+
+    {{ template "footer" . }}
+    {{ template "app_js" }}
+    <script>
+      (async function () {
+        const A = window.App;
+        let items = await A.load("/api/me/reservations", function () {
+          return A.SAMPLE.reservations().filter(function (r) { return r.user_id === "user-2"; });
+        });
+        let tab = "upcoming";
+
+        function group(r) {
+          if (r.status === "CANCELLED" || r.status === "EXPIRED") return "cancelled";
+          return new Date(r.end_at) < new Date() ? "past" : "upcoming";
+        }
+
+        function render() {
+          const counts = { upcoming: 0, past: 0, cancelled: 0 };
+          items.forEach(function (r) { counts[group(r)]++; });
+          Object.keys(counts).forEach(function (k) {
+            document.querySelector('[data-count="' + k + '"]').textContent = counts[k];
+          });
+
+          const list = items
+            .filter(function (r) { return group(r) === tab; })
+            .sort(function (a, b) {
+              const d = new Date(a.start_at) - new Date(b.start_at);
+              return tab === "upcoming" ? d : -d;
+            });
+
+          const box = document.getElementById("list");
+          if (!list.length) {
+            const msg = { upcoming: "今後の予約はありません", past: "過去の予約はありません", cancelled: "キャンセルした予約はありません" }[tab];
+            box.innerHTML = '<div class="empty"><h2>' + msg + "</h2>" +
+              (tab === "upcoming" ? '<p><a class="btn btn-primary" href="/search">会議室を探す</a></p>' : "") + "</div>";
+            return;
+          }
+
+          box.innerHTML = list.map(function (r) {
+            const room = r.room || {};
+            const loc = r.location || {};
+            let actions = "";
+            if (tab === "upcoming") {
+              if (r.status === "HELD") {
+                actions += '<button type="button" class="btn btn-primary" data-confirm="' + A.esc(r.id) + '">予約を確定</button>';
+              }
+              actions += '<button type="button" class="btn btn-danger" data-cancel="' + A.esc(r.id) + '">キャンセル</button>';
+            }
+            actions += '<a class="btn btn-outline" href="/rooms/' + encodeURIComponent(room.id || r.room_id) + '">会議室を見る</a>';
+            const hold = r.status === "HELD" && r.hold_expires_at
+              ? '<div class="hold-note">' + A.esc(A.hm(new Date(r.hold_expires_at))) + " までに確定してください</div>"
+              : "";
+            return '<article class="resv-card">' +
+              A.thumb(room.id || r.room_id) +
+              "<div>" +
+              "<h2>" + A.esc(r.title) + " " + A.statusBadge(r.status) + "</h2>" +
+              '<div class="when">' + A.esc(A.fmtRange(r.start_at, r.end_at)) + "</div>" +
+              '<div class="sub">' + A.esc(room.name || "") + " ・ " + A.esc(loc.name || "") + " ・ " + A.esc(r.attendees) + "名</div>" +
+              hold +
+              "</div>" +
+              '<div class="actions">' + actions + "</div>" +
+              "</article>";
+          }).join("");
+        }
+
+        document.querySelectorAll("[data-tab]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            tab = btn.dataset.tab;
+            document.querySelectorAll("[data-tab]").forEach(function (b) {
+              b.setAttribute("aria-selected", String(b === btn));
+            });
+            render();
+          });
+        });
+
+        function update(id, status) {
+          items = items.map(function (r) { return r.id === id ? Object.assign({}, r, { status: status }) : r; });
+          render();
+        }
+
+        document.getElementById("list").addEventListener("click", async function (e) {
+          const cancelBtn = e.target.closest("[data-cancel]");
+          const confirmBtn = e.target.closest("[data-confirm]");
+          if (cancelBtn) {
+            const id = cancelBtn.dataset.cancel;
+            const r = items.find(function (x) { return x.id === id; });
+            const ok = await A.confirmDialog("予約をキャンセルしますか?", r.title + "(" + A.fmtRange(r.start_at, r.end_at) + ")をキャンセルします。この操作は取り消せません。", "キャンセルする", true);
+            if (!ok) return;
+            try {
+              await A.send("/api/reservations/" + encodeURIComponent(id) + "/cancel", "POST", {}, function () { return {}; });
+              update(id, "CANCELLED");
+              A.toast("予約をキャンセルしました", "success");
+            } catch (err) {
+              A.toast(err.message, "error");
+            }
+          }
+          if (confirmBtn) {
+            const id = confirmBtn.dataset.confirm;
+            confirmBtn.disabled = true;
+            try {
+              await A.send("/api/reservations/" + encodeURIComponent(id) + "/confirm", "POST", {}, function () { return {}; });
+              update(id, "CONFIRMED");
+              A.toast("予約を確定しました", "success");
+            } catch (err) {
+              A.toast(err.message, "error");
+              confirmBtn.disabled = false;
+            }
+          }
+        });
+
+        render();
+      })();
+    </script>
+  </body>
+</html>

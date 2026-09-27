@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <title>管理画面 | RoomBook</title>
+    {{ template "head" . }}
+  </head>
+  <body class="admin-body">
+    {{ template "icons" }}
+    <div class="admin-shell">
+      <aside class="admin-side" id="admin-side" aria-label="管理メニュー">
+        <a class="brand" href="/admin">RoomBook<small>管理</small></a>
+        <nav class="admin-nav">
+          <a href="#dashboard" data-nav="dashboard"><svg class="icon"><use href="#i-dashboard"/></svg>ダッシュボード</a>
+          <a href="#reservations" data-nav="reservations"><svg class="icon"><use href="#i-calendar"/></svg>予約管理</a>
+          <a href="#rooms" data-nav="rooms"><svg class="icon"><use href="#i-room"/></svg>会議室</a>
+          <a href="#locations" data-nav="locations"><svg class="icon"><use href="#i-building"/></svg>拠点</a>
+          <a href="#users" data-nav="users"><svg class="icon"><use href="#i-user"/></svg>ユーザー</a>
+        </nav>
+        <div class="foot">利用者向けサイトは<a href="/" style="color: #fff; text-decoration: underline">こちら</a></div>
+      </aside>
+
+      <div class="admin-main">
+        <header class="admin-top">
+          <div style="display: flex; align-items: center; gap: 8px">
+            <button type="button" class="menu-toggle" id="menu-toggle" aria-label="メニューを開く" aria-controls="admin-side" aria-expanded="false">
+              <svg class="icon"><use href="#i-menu"/></svg>
+            </button>
+            <h1 id="section-title">ダッシュボード</h1>
+          </div>
+          <div class="right">
+            <span class="badge badge-admin">admin</span>
+            <span class="user-name">{{ if .userName }}{{ .userName }}{{ else }}管理者{{ end }}</span>
+            <a class="btn btn-outline" href="/admin/logout"><svg class="icon icon-sm"><use href="#i-logout"/></svg>ログアウト</a>
+          </div>
+        </header>
+
+        <div class="admin-content">
+          <div data-demo-notice></div>
+
+          <!-- ダッシュボード -->
+          <section data-section="dashboard" hidden>
+            <div class="stats" id="stats"></div>
+            <div class="card">
+              <div class="card-head">
+                <h2>本日の予約</h2>
+                <a href="#reservations" class="btn btn-text">すべて見る ›</a>
+              </div>
+              <div class="table-wrap"><table class="table" id="today-table"></table></div>
+            </div>
+          </section>
+
+          <!-- 予約管理 -->
+          <section data-section="reservations" hidden>
+            <div class="card">
+              <div class="card-head">
+                <h2>予約一覧</h2>
+                <div class="toolbar">
+                  <input type="date" class="input" id="r-date" aria-label="日付" />
+                  <select class="select" id="r-location" aria-label="拠点"></select>
+                  <select class="select" id="r-status" aria-label="状態">
+                    <option value="">すべての状態</option>
+                    <option value="HELD">仮押さえ</option>
+                    <option value="CONFIRMED">確定</option>
+                    <option value="CANCELLED">キャンセル</option>
+                    <option value="EXPIRED">期限切れ</option>
+                  </select>
+                  <input type="search" class="input" id="r-keyword" placeholder="会議名・予約者で検索" aria-label="キーワード" />
+                  <button type="button" class="btn btn-text" id="r-clear">条件をクリア</button>
+                </div>
+              </div>
+              <div class="table-wrap"><table class="table" id="resv-table"></table></div>
+            </div>
+          </section>
+
+          <!-- 会議室 -->
+          <section data-section="rooms" hidden>
+            <div class="card">
+              <div class="card-head">
+                <h2>会議室一覧</h2>
+                <div class="toolbar">
+                  <select class="select" id="room-location" aria-label="拠点"></select>
+                  <button type="button" class="btn btn-primary" id="room-add"><svg class="icon icon-sm"><use href="#i-plus"/></svg>会議室を追加</button>
+                </div>
+              </div>
+              <div class="table-wrap"><table class="table" id="room-table"></table></div>
+            </div>
+          </section>
+
+          <!-- 拠点 -->
+          <section data-section="locations" hidden>
+            <div class="card">
+              <div class="card-head">
+                <h2>拠点一覧</h2>
+                <button type="button" class="btn btn-primary" id="loc-add"><svg class="icon icon-sm"><use href="#i-plus"/></svg>拠点を追加</button>
+              </div>
+              <div class="table-wrap"><table class="table" id="loc-table"></table></div>
+            </div>
+          </section>
+
+          <!-- ユーザー -->
+          <section data-section="users" hidden>
+            <div class="card">
+              <div class="card-head">
+                <h2>ユーザー一覧</h2>
+                <div class="toolbar">
+                  <input type="search" class="input" id="u-keyword" placeholder="名前・メールで検索" aria-label="キーワード" />
+                </div>
+              </div>
+              <div class="table-wrap"><table class="table" id="user-table"></table></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast-area" id="toast-area" aria-live="polite"></div>
+    {{ template "app_js" }}
+    <script>
+      (async function () {
+        const A = window.App;
+        const esc = A.esc;
+        const TITLES = { dashboard: "ダッシュボード", reservations: "予約管理", rooms: "会議室", locations: "拠点", users: "ユーザー" };
+
+        const data = { locations: [], rooms: [], reservations: [], users: [], equipment: [], stats: null };
+
+        // ---------- ナビゲーション ----------
+        const side = document.getElementById("admin-side");
+        const toggle = document.getElementById("menu-toggle");
+        toggle.addEventListener("click", function () {
+          const open = side.classList.toggle("open");
+          toggle.setAttribute("aria-expanded", String(open));
+        });
+
+        function show() {
+          const name = (location.hash || "#dashboard").slice(1);
+          const key = TITLES[name] ? name : "dashboard";
+          document.querySelectorAll("[data-section]").forEach(function (s) { s.hidden = s.dataset.section !== key; });
+          document.querySelectorAll("[data-nav]").forEach(function (a) {
+            if (a.dataset.nav === key) a.setAttribute("aria-current", "page");
+            else a.removeAttribute("aria-current");
+          });
+          document.getElementById("section-title").textContent = TITLES[key];
+          side.classList.remove("open");
+          toggle.setAttribute("aria-expanded", "false");
+        }
+        window.addEventListener("hashchange", show);
+        show();
+
+        // ---------- データ読み込み ----------
+        const [locations, rooms, reservations, users, equipment, stats] = await Promise.all([
+          A.load("/api/admin/locations", A.SAMPLE.locations),
+          A.load("/api/admin/rooms", A.SAMPLE.rooms),
+          A.load("/api/admin/reservations", A.SAMPLE.reservations),
+          A.load("/api/admin/users", A.SAMPLE.users),
+          A.load("/api/equipment", A.SAMPLE.equipment),
+          A.load("/api/admin/stats", null),
+        ]);
+        Object.assign(data, { locations: locations, rooms: rooms, reservations: reservations, users: users, equipment: equipment, stats: stats });
+
+        function locName(id) {
+          const l = data.locations.find(function (x) { return x.id === id; });
+          return l ? l.name : "-";
+        }
+        function locOptions(allLabel) {
+          return '<option value="">' + esc(allLabel) + "</option>" + data.locations.map(function (l) {
+            return '<option value="' + esc(l.id) + '">' + esc(l.name) + "</option>";
+          }).join("");
+        }
+        function emptyRow(cols, msg) {
+          return '<tr class="empty-row"><td colspan="' + cols + '">' + esc(msg) + "</td></tr>";
+        }
+
+        // ---------- ダッシュボード ----------
+        function renderDashboard() {
+          const t = A.today();
+          const todays = data.reservations.filter(function (r) { return A.ymd(new Date(r.start_at)) === t; });
+          // /api/admin/stats が無い場合は手元のデータから計算する
+          const s = data.stats || {
+            today_reservations: todays.filter(function (r) { return r.status === "CONFIRMED" || r.status === "HELD"; }).length,
+            held: data.reservations.filter(function (r) { return r.status === "HELD"; }).length,
+            active_rooms: data.rooms.filter(function (r) { return r.is_active; }).length,
+            total_rooms: data.rooms.length,
+            users: data.users.length,
+          };
+          document.getElementById("stats").innerHTML =
+            '<div class="stat"><small>' + A.icon("i-calendar", "icon-sm") + "本日の予約</small><strong>" + s.today_reservations + '</strong><span class="delta">仮押さえ・確定</span></div>' +
+            '<div class="stat"><small>' + A.icon("i-clock", "icon-sm") + "仮押さえ中</small><strong>" + s.held + '</strong><span class="delta">期限内に確定待ち</span></div>' +
+            '<div class="stat"><small>' + A.icon("i-room", "icon-sm") + "稼働中の会議室</small><strong>" + s.active_rooms + '</strong><span class="delta">全 ' + s.total_rooms + " 室</span></div>" +
+            '<div class="stat"><small>' + A.icon("i-user", "icon-sm") + "ユーザー</small><strong>" + s.users + '</strong><span class="delta">登録済み</span></div>';
+
+          const rows = todays.sort(function (a, b) { return new Date(a.start_at) - new Date(b.start_at); }).map(function (r) {
+            return "<tr><td>" + esc(A.hm(new Date(r.start_at))) + "〜" + esc(A.hm(new Date(r.end_at))) + "</td>" +
+              "<td>" + esc((r.room || {}).name) + "</td><td>" + esc((r.location || {}).name) + "</td>" +
+              "<td>" + esc(r.title) + "</td><td>" + esc((r.user || {}).name) + "</td><td>" + A.statusBadge(r.status) + "</td></tr>";
+          }).join("");
+          document.getElementById("today-table").innerHTML =
+            "<thead><tr><th>時間</th><th>会議室</th><th>拠点</th><th>会議名</th><th>予約者</th><th>状態</th></tr></thead>" +
+            "<tbody>" + (rows || emptyRow(6, "本日の予約はありません")) + "</tbody>";
+        }
+
+        // ---------- 予約管理 ----------
+        const rDate = document.getElementById("r-date");
+        const rLoc = document.getElementById("r-location");
+        const rStatus = document.getElementById("r-status");
+        const rKeyword = document.getElementById("r-keyword");
+        rLoc.innerHTML = locOptions("すべての拠点");
+
+        function renderReservations() {
+          const kw = rKeyword.value.trim().toLowerCase();
+          const list = data.reservations.filter(function (r) {
+            if (rDate.value && A.ymd(new Date(r.start_at)) !== rDate.value) return false;
+            if (rLoc.value && (r.location || {}).id !== rLoc.value) return false;
+            if (rStatus.value && r.status !== rStatus.value) return false;
+            if (kw) {
+              const text = (r.title + " " + ((r.user || {}).name || "") + " " + ((r.user || {}).email || "")).toLowerCase();
+              if (!text.includes(kw)) return false;
+            }
+            return true;
+          }).sort(function (a, b) { return new Date(b.start_at) - new Date(a.start_at); });
+
+          const rows = list.map(function (r) {
+            const canCancel = r.status === "HELD" || r.status === "CONFIRMED";
+            return "<tr><td>" + esc(A.fmtRange(r.start_at, r.end_at)) + "</td>" +
+              "<td>" + esc((r.room || {}).name) + "</td><td>" + esc((r.location || {}).name) + "</td>" +
+              "<td>" + esc(r.title) + "</td>" +
+              "<td>" + esc((r.user || {}).name) + '<br><span class="muted">' + esc((r.user || {}).email) + "</span></td>" +
+              '<td class="num">' + esc(r.attendees) + "</td>" +
+              "<td>" + A.statusBadge(r.status) + "</td>" +
+              '<td><div class="actions">' + (canCancel ? '<button type="button" class="btn btn-danger" data-cancel="' + esc(r.id) + '">キャンセル</button>' : "") + "</div></td></tr>";
+          }).join("");
+          document.getElementById("resv-table").innerHTML =
+            '<thead><tr><th>日時</th><th>会議室</th><th>拠点</th><th>会議名</th><th>予約者</th><th class="num">人数</th><th>状態</th><th></th></tr></thead>' +
+            "<tbody>" + (rows || emptyRow(8, "条件に合う予約はありません")) + "</tbody>";
+        }
+        [rDate, rLoc, rStatus, rKeyword].forEach(function (el) { el.addEventListener("input", renderReservations); });
+        document.getElementById("r-clear").addEventListener("click", function () {
+          rDate.value = rLoc.value = rStatus.value = rKeyword.value = "";
+          renderReservations();
+        });
+        document.getElementById("resv-table").addEventListener("click", async function (e) {
+          const btn = e.target.closest("[data-cancel]");
+          if (!btn) return;
+          const r = data.reservations.find(function (x) { return x.id === btn.dataset.cancel; });
+          const ok = await A.confirmDialog("予約をキャンセルしますか?",
+            (r.user || {}).name + " さんの「" + r.title + "」(" + A.fmtRange(r.start_at, r.end_at) + ")をキャンセルします。", "キャンセルする", true);
+          if (!ok) return;
+          try {
+            await A.send("/api/admin/reservations/" + encodeURIComponent(r.id) + "/cancel", "POST", {}, function () { return {}; });
+            r.status = "CANCELLED";
+            data.stats = null;
+            renderAll();
+            A.toast("予約をキャンセルしました", "success");
+          } catch (err) {
+            A.toast(err.message, "error");
+          }
+        });
+
+        // ---------- 会議室 ----------
+        const roomLoc = document.getElementById("room-location");
+        roomLoc.innerHTML = locOptions("すべての拠点");
+        roomLoc.addEventListener("input", renderRooms);
+
+        function renderRooms() {
+          const list = data.rooms.filter(function (r) { return !roomLoc.value || r.location_id === roomLoc.value; });
+          const rows = list.map(function (r) {
+            const eq = (r.equipment || []).map(function (e) { return '<span class="tag">' + esc(e.name) + "</span>"; }).join(" ");
+            return "<tr><td><strong>" + esc(r.name) + "</strong></td><td>" + esc(locName(r.location_id)) + "</td>" +
+              '<td class="num">' + esc(r.capacity) + '名</td><td class="num">' + A.yen(r.hourly_price) + "</td>" +
+              '<td><div class="tags" style="flex-wrap:nowrap">' + (eq || '<span class="muted">なし</span>') + "</div></td>" +
+              '<td><label class="switch"><input type="checkbox" data-active="' + esc(r.id) + '"' + (r.is_active ? " checked" : "") + ' aria-label="' + esc(r.name) + 'を有効にする" />' +
+              (r.is_active ? "有効" : '<span class="muted">無効</span>') + "</label></td>" +
+              '<td><div class="actions"><button type="button" class="btn btn-outline" data-edit-room="' + esc(r.id) + '">編集</button></div></td></tr>';
+          }).join("");
+          document.getElementById("room-table").innerHTML =
+            '<thead><tr><th>名前</th><th>拠点</th><th class="num">定員</th><th class="num">料金/時間</th><th>設備</th><th>状態</th><th></th></tr></thead>' +
+            "<tbody>" + (rows || emptyRow(7, "会議室が登録されていません")) + "</tbody>";
+        }
+
+        function roomForm(room) {
+          const r = room || { name: "", location_id: roomLoc.value || (data.locations[0] || {}).id, capacity: 4, hourly_price: 0, is_active: true, equipment: [] };
+          const has = (r.equipment || []).map(function (e) { return e.id; });
+          const m = A.modal({
+            title: room ? "会議室を編集" : "会議室を追加",
+            body:
+              '<form id="room-form" novalidate style="display:flex;flex-direction:column;gap:14px">' +
+              '<label class="form-field"><span>名前</span><input class="input" name="name" required maxlength="100" value="' + esc(r.name) + '" /></label>' +
+              '<label class="form-field"><span>拠点</span><select class="select" name="location_id">' +
+              data.locations.map(function (l) { return '<option value="' + esc(l.id) + '"' + (l.id === r.location_id ? " selected" : "") + ">" + esc(l.name) + "</option>"; }).join("") +
+              "</select></label>" +
+              '<div class="form-row">' +
+              '<label class="form-field"><span>定員(名)</span><input class="input" type="number" name="capacity" min="1" required value="' + esc(r.capacity) + '" /></label>' +
+              '<label class="form-field"><span>料金(円/時間)</span><input class="input" type="number" name="hourly_price" min="0" step="100" required value="' + esc(r.hourly_price) + '" /></label>' +
+              "</div>" +
+              '<div class="form-field"><span>設備</span><div class="chip-select">' +
+              data.equipment.map(function (e) {
+                return '<label><input type="checkbox" name="equipment" value="' + esc(e.id) + '"' + (has.includes(e.id) ? " checked" : "") + " />" + esc(e.name) + "</label>";
+              }).join("") + "</div></div>" +
+              '<label class="check"><input type="checkbox" name="is_active"' + (r.is_active ? " checked" : "") + " /> 予約を受け付ける(有効)</label>" +
+              '<p class="form-error" data-error hidden></p>' +
+              "</form>",
+            foot: '<button type="button" class="btn btn-outline" data-close>キャンセル</button><button type="submit" form="room-form" class="btn btn-primary">保存</button>',
+          });
+          const form = m.el.querySelector("#room-form");
+          form.addEventListener("submit", async function (e) {
+            e.preventDefault();
+            const err = form.querySelector("[data-error]");
+            const body = {
+              name: form.elements.name.value.trim(),
+              location_id: form.elements.location_id.value,
+              capacity: Number(form.elements.capacity.value),
+              hourly_price: Number(form.elements.hourly_price.value),
+              is_active: form.elements.is_active.checked,
+              equipment_ids: Array.from(form.querySelectorAll("input[name=equipment]:checked")).map(function (i) { return i.value; }),
+            };
+            const problem = !body.name ? "名前を入力してください。"
+              : !body.location_id ? "拠点を選択してください。"
+              : !(body.capacity > 0) ? "定員は1以上にしてください。"
+              : !(body.hourly_price >= 0) ? "料金は0以上にしてください。" : "";
+            if (problem) { err.textContent = problem; err.hidden = false; return; }
+            try {
+              const path = room ? "/api/admin/rooms/" + encodeURIComponent(room.id) : "/api/admin/rooms";
+              const saved = await A.send(path, room ? "PUT" : "POST", body, function () {
+                return Object.assign({ id: room ? room.id : A.uuid() }, body);
+              });
+              saved.equipment = saved.equipment || data.equipment.filter(function (e) { return body.equipment_ids.includes(e.id); });
+              if (room) Object.assign(room, saved);
+              else data.rooms.push(saved);
+              data.stats = null;
+              m.close();
+              renderAll();
+              A.toast(room ? "会議室を更新しました" : "会議室を追加しました", "success");
+            } catch (ex) {
+              err.textContent = ex.status === 409 ? "同じ拠点に同じ名前の会議室があります。" : ex.message;
+              err.hidden = false;
+            }
+          });
+        }
+
+        document.getElementById("room-add").addEventListener("click", function () { roomForm(null); });
+        document.getElementById("room-table").addEventListener("click", function (e) {
+          const btn = e.target.closest("[data-edit-room]");
+          if (btn) roomForm(data.rooms.find(function (r) { return r.id === btn.dataset.editRoom; }));
+        });
+        // 会議室は削除せず、有効/無効を切り替える
+        document.getElementById("room-table").addEventListener("change", async function (e) {
+          const input = e.target.closest("[data-active]");
+          if (!input) return;
+          const room = data.rooms.find(function (r) { return r.id === input.dataset.active; });
+          const next = input.checked;
+          if (!next) {
+            const ok = await A.confirmDialog("会議室を無効にしますか?", "「" + room.name + "」は検索結果に表示されなくなり、新しい予約を受け付けなくなります。既存の予約はそのまま残ります。", "無効にする", true);
+            if (!ok) { input.checked = true; return; }
+          }
+          try {
+            await A.send("/api/admin/rooms/" + encodeURIComponent(room.id), "PUT", Object.assign({}, room, { is_active: next, location: undefined }), function () { return {}; });
+            room.is_active = next;
+            data.stats = null;
+            renderAll();
+            A.toast(next ? "会議室を有効にしました" : "会議室を無効にしました", "success");
+          } catch (err) {
+            input.checked = !next;
+            A.toast(err.message, "error");
+          }
+        });
+
+        // ---------- 拠点 ----------
+        function renderLocations() {
+          const rows = data.locations.map(function (l) {
+            const count = data.rooms.filter(function (r) { return r.location_id === l.id; }).length;
+            return "<tr><td><strong>" + esc(l.name) + "</strong></td><td>" + (l.address ? esc(l.address) : '<span class="muted">未登録</span>') + "</td>" +
+              "<td>" + esc(l.timezone) + "</td><td>" + esc(String(l.open_time).slice(0, 5)) + "〜" + esc(String(l.close_time).slice(0, 5)) + "</td>" +
+              '<td class="num">' + count + "室</td>" +
+              '<td><div class="actions"><button type="button" class="btn btn-outline" data-edit-loc="' + esc(l.id) + '">編集</button></div></td></tr>';
+          }).join("");
+          document.getElementById("loc-table").innerHTML =
+            '<thead><tr><th>名前</th><th>住所</th><th>タイムゾーン</th><th>営業時間</th><th class="num">会議室</th><th></th></tr></thead>' +
+            "<tbody>" + (rows || emptyRow(6, "拠点が登録されていません")) + "</tbody>";
+        }
+
+        function locForm(loc) {
+          const l = loc || { name: "", address: "", timezone: "Asia/Tokyo", open_time: "08:00", close_time: "22:00" };
+          const m = A.modal({
+            title: loc ? "拠点を編集" : "拠点を追加",
+            body:
+              '<form id="loc-form" novalidate style="display:flex;flex-direction:column;gap:14px">' +
+              '<label class="form-field"><span>名前</span><input class="input" name="name" required maxlength="100" value="' + esc(l.name) + '" /></label>' +
+              '<label class="form-field"><span>住所(任意)</span><input class="input" name="address" maxlength="200" value="' + esc(l.address || "") + '" /></label>' +
+              '<label class="form-field"><span>タイムゾーン</span><select class="select" name="timezone">' +
+              ["Asia/Tokyo", "Asia/Seoul", "Asia/Singapore", "UTC"].map(function (tz) {
+                return '<option value="' + tz + '"' + (tz === l.timezone ? " selected" : "") + ">" + tz + "</option>";
+              }).join("") + "</select></label>" +
+              '<div class="form-row">' +
+              '<label class="form-field"><span>開始時刻</span><select class="select" name="open_time">' + A.timeOptions("00:00", "23:30", String(l.open_time).slice(0, 5)) + "</select></label>" +
+              '<label class="form-field"><span>終了時刻</span><select class="select" name="close_time">' + A.timeOptions("00:30", "23:30", String(l.close_time).slice(0, 5)) + "</select></label>" +
+              "</div>" +
+              '<p class="form-error" data-error hidden></p>' +
+              "</form>",
+            foot: '<button type="button" class="btn btn-outline" data-close>キャンセル</button><button type="submit" form="loc-form" class="btn btn-primary">保存</button>',
+          });
+          const form = m.el.querySelector("#loc-form");
+          form.addEventListener("submit", async function (e) {
+            e.preventDefault();
+            const err = form.querySelector("[data-error]");
+            const body = {
+              name: form.elements.name.value.trim(),
+              address: form.elements.address.value.trim() || null,
+              timezone: form.elements.timezone.value,
+              open_time: form.elements.open_time.value,
+              close_time: form.elements.close_time.value,
+            };
+            const problem = !body.name ? "名前を入力してください。"
+              : A.toMin(body.open_time) >= A.toMin(body.close_time) ? "終了時刻は開始時刻より後にしてください。" : "";
+            if (problem) { err.textContent = problem; err.hidden = false; return; }
+            try {
+              const path = loc ? "/api/admin/locations/" + encodeURIComponent(loc.id) : "/api/admin/locations";
+              const saved = await A.send(path, loc ? "PUT" : "POST", body, function () {
+                return Object.assign({ id: loc ? loc.id : A.uuid() }, body);
+              });
+              if (loc) Object.assign(loc, saved);
+              else data.locations.push(saved);
+              m.close();
+              rLoc.innerHTML = locOptions("すべての拠点");
+              roomLoc.innerHTML = locOptions("すべての拠点");
+              renderAll();
+              A.toast(loc ? "拠点を更新しました" : "拠点を追加しました", "success");
+            } catch (ex) {
+              err.textContent = ex.status === 409 ? "同じ名前の拠点が既にあります。" : ex.message;
+              err.hidden = false;
+            }
+          });
+        }
+
+        document.getElementById("loc-add").addEventListener("click", function () { locForm(null); });
+        document.getElementById("loc-table").addEventListener("click", function (e) {
+          const btn = e.target.closest("[data-edit-loc]");
+          if (btn) locForm(data.locations.find(function (l) { return l.id === btn.dataset.editLoc; }));
+        });
+
+        // ---------- ユーザー ----------
+        const uKeyword = document.getElementById("u-keyword");
+        uKeyword.addEventListener("input", renderUsers);
+
+        function renderUsers() {
+          const kw = uKeyword.value.trim().toLowerCase();
+          const rows = data.users.filter(function (u) {
+            return !kw || (u.name + " " + u.email).toLowerCase().includes(kw);
+          }).map(function (u) {
+            return "<tr><td><strong>" + esc(u.name) + "</strong></td><td>" + esc(u.email) + "</td><td>" + esc(u.provider || "-") + "</td>" +
+              "<td>" + (u.created_at ? esc(A.fmtDate(new Date(u.created_at))) : "-") + "</td>" +
+              '<td><select class="select" style="width:auto;min-height:32px;padding:4px 8px" data-role="' + esc(u.id) + '" aria-label="' + esc(u.name) + 'の権限">' +
+              '<option value="member"' + (u.role === "member" ? " selected" : "") + ">member(一般)</option>" +
+              '<option value="admin"' + (u.role === "admin" ? " selected" : "") + ">admin(管理者)</option>" +
+              "</select></td></tr>";
+          }).join("");
+          document.getElementById("user-table").innerHTML =
+            "<thead><tr><th>名前</th><th>メールアドレス</th><th>ログイン方法</th><th>登録日</th><th>権限</th></tr></thead>" +
+            "<tbody>" + (rows || emptyRow(5, "該当するユーザーはいません")) + "</tbody>";
+        }
+
+        document.getElementById("user-table").addEventListener("change", async function (e) {
+          const sel = e.target.closest("[data-role]");
+          if (!sel) return;
+          const user = data.users.find(function (u) { return u.id === sel.dataset.role; });
+          const next = sel.value;
+          const ok = await A.confirmDialog("権限を変更しますか?",
+            user.name + " さんの権限を「" + next + "」に変更します。" + (next === "admin" ? "管理画面にログインできるようになります。" : "管理画面にログインできなくなります。"),
+            "変更する", next !== "admin");
+          if (!ok) { sel.value = user.role; return; }
+          try {
+            await A.send("/api/admin/users/" + encodeURIComponent(user.id) + "/role", "PUT", { role: next }, function () { return {}; });
+            user.role = next;
+            A.toast("権限を変更しました", "success");
+          } catch (err) {
+            sel.value = user.role;
+            A.toast(err.message, "error");
+          }
+        });
+
+        function renderAll() {
+          renderDashboard();
+          renderReservations();
+          renderRooms();
+          renderLocations();
+          renderUsers();
+        }
+        renderAll();
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,1056 @@
+{{/*
+  全ページ共通のパーツ。
+  router の LoadHTMLGlob("views/*") で一緒に読み込まれるため、
+  各ページから {{ template "head" . }} のように呼び出せる。
+
+  テンプレートに渡すと表示が切り替わる値(すべて任意):
+    .userName  ログイン中のユーザー名(ヘッダーに表示)
+    .isAdmin   true なら利用者画面のヘッダーに「管理画面」リンクを出す
+    .error     admin_login.html などでエラーメッセージを表示
+*/}}
+
+{{ define "head" }}
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --navy: #003b95;
+    --navy-dark: #00224f;
+    --blue: #006ce4;
+    --blue-hover: #0057b8;
+    --blue-light: #ebf3ff;
+    --yellow: #ffb700;
+    --green: #008234;
+    --green-bg: #e7fde9;
+    --red: #d4111e;
+    --red-bg: #fff0f0;
+    --orange: #923e01;
+    --orange-bg: #fff0e0;
+    --gray-bg: #f2f2f2;
+    --text: #1a1a1a;
+    --muted: #595959;
+    --border: #e7e7e7;
+    --border-strong: #868686;
+    --bg: #ffffff;
+    --bg-alt: #f5f5f5;
+    --radius: 8px;
+    --shadow: 0 2px 8px rgba(26, 26, 26, 0.16);
+    --shadow-lg: 0 8px 24px rgba(26, 26, 26, 0.24);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  h1, h2, h3, h4 { margin: 0; line-height: 1.3; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+
+  .container { max-width: 1128px; margin: 0 auto; padding: 0 16px; }
+  .visually-hidden {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+  .icon { width: 20px; height: 20px; flex: none; fill: currentColor; }
+  .icon-sm { width: 16px; height: 16px; }
+  .muted { color: var(--muted); }
+
+  /* ---------- ヘッダー ---------- */
+  .site-header { background: var(--navy); color: #fff; }
+  .site-header .bar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; min-height: 64px;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 8px;
+    color: #fff; font-size: 22px; font-weight: 700; letter-spacing: -0.02em;
+  }
+  .brand:hover { text-decoration: none; }
+  .brand small {
+    font-size: 12px; font-weight: 500; opacity: 0.85; letter-spacing: 0;
+  }
+  .header-nav { display: flex; align-items: center; gap: 4px; }
+  .header-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 12px; border-radius: 4px; color: #fff; font-weight: 500;
+  }
+  .header-link:hover { background: rgba(255, 255, 255, 0.1); text-decoration: none; }
+  .header-link.active { background: rgba(255, 255, 255, 0.15); }
+  .header-user {
+    display: inline-flex; align-items: center; gap: 8px; padding: 4px 8px; color: #fff;
+  }
+  .avatar {
+    display: inline-grid; place-items: center; width: 32px; height: 32px;
+    border-radius: 50%; background: var(--yellow); color: var(--navy-dark);
+    font-weight: 700; border: 2px solid #fff;
+  }
+
+  /* ---------- ボタン ---------- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    min-height: 36px; padding: 8px 16px; border-radius: 4px;
+    border: 1px solid transparent; background: none; cursor: pointer;
+    font-weight: 500; font-size: 14px; line-height: 1.2; white-space: nowrap;
+    text-decoration: none;
+  }
+  .btn:hover { text-decoration: none; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--blue-hover); }
+  .btn-outline { border-color: var(--blue); color: var(--blue); background: #fff; }
+  .btn-outline:hover:not(:disabled) { background: var(--blue-light); }
+  .btn-light { background: #fff; color: var(--blue); }
+  .btn-light:hover:not(:disabled) { background: var(--blue-light); }
+  .btn-header { border-color: #fff; color: #fff; }
+  .btn-header:hover { background: rgba(255, 255, 255, 0.1); }
+  .btn-danger { border-color: var(--red); color: var(--red); background: #fff; }
+  .btn-danger:hover:not(:disabled) { background: var(--red-bg); }
+  .btn-text { color: var(--blue); padding-left: 8px; padding-right: 8px; }
+  .btn-text:hover { background: var(--blue-light); }
+  .btn-lg { min-height: 48px; padding: 12px 24px; font-size: 16px; }
+  .btn-block { width: 100%; }
+
+  /* ---------- フォーム ---------- */
+  .form-field { display: flex; flex-direction: column; gap: 4px; }
+  .form-field > span, .form-label { font-weight: 600; font-size: 14px; }
+  .input, .select, .textarea {
+    width: 100%; min-height: 40px; padding: 8px 10px; background: #fff;
+    border: 1px solid var(--border-strong); border-radius: 4px;
+  }
+  .input:focus, .select:focus, .textarea:focus {
+    outline: 2px solid var(--blue); outline-offset: -1px; border-color: var(--blue);
+  }
+  .form-hint { font-size: 12px; color: var(--muted); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .check {
+    display: flex; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer;
+  }
+  .check input { width: 18px; height: 18px; accent-color: var(--blue); margin: 0; }
+  .check .count { margin-left: auto; color: var(--muted); font-size: 13px; }
+
+  /* ---------- ヒーロー + 検索バー ---------- */
+  .hero { background: var(--navy); color: #fff; padding: 40px 0 72px; }
+  .hero h1 { font-size: 40px; font-weight: 800; letter-spacing: -0.02em; }
+  .hero p { margin: 8px 0 0; font-size: 20px; opacity: 0.95; }
+
+  .searchbar {
+    display: flex; gap: 4px; padding: 4px; background: var(--yellow);
+    border-radius: 8px; box-shadow: var(--shadow);
+  }
+  .hero + .container .searchbar, .searchbar.overlap { margin-top: -30px; }
+  .searchbar .sb-field {
+    display: flex; align-items: center; gap: 8px; flex: 1 1 0; min-width: 0;
+    background: #fff; border-radius: 4px; padding: 0 12px; min-height: 52px;
+  }
+  .searchbar .sb-field.wide { flex-grow: 1.6; }
+  .searchbar .sb-field .icon { color: var(--muted); }
+  .searchbar .sb-field label { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+  .searchbar .sb-field label small { font-size: 11px; color: var(--muted); line-height: 1.2; }
+  .searchbar input, .searchbar select {
+    border: 0; background: none; padding: 0; min-height: 22px; width: 100%;
+    font-size: 15px; font-weight: 500;
+  }
+  .searchbar input:focus, .searchbar select:focus { outline: none; }
+  .searchbar .sb-field:focus-within { outline: 2px solid var(--blue); outline-offset: -2px; }
+  .searchbar .time-pair { display: flex; align-items: center; gap: 4px; }
+  .searchbar .time-pair select { width: auto; }
+  .searchbar .btn { min-height: 52px; font-size: 18px; padding: 0 24px; }
+
+  /* ---------- セクション ---------- */
+  .section { padding: 32px 0; }
+  .section-title { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+  .section-sub { color: var(--muted); margin: 0 0 16px; font-size: 15px; }
+
+  .grid { display: grid; gap: 16px; }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+
+  /* 写真がないため、会議室ごとに色を変えたプレースホルダーを使う */
+  .thumb {
+    position: relative; display: grid; place-items: center; overflow: hidden;
+    background: linear-gradient(135deg, var(--thumb-a, #5b8def), var(--thumb-b, #003b95));
+    color: rgba(255, 255, 255, 0.9);
+  }
+  .thumb svg { width: 40%; max-width: 72px; height: auto; fill: currentColor; opacity: 0.9; }
+  .thumb .thumb-label {
+    position: absolute; left: 8px; bottom: 8px; padding: 2px 8px; border-radius: 4px;
+    background: rgba(0, 0, 0, 0.45); color: #fff; font-size: 12px; font-weight: 600;
+  }
+
+  .location-card {
+    display: block; border-radius: var(--radius); overflow: hidden; color: var(--text);
+    box-shadow: var(--shadow); background: #fff; transition: box-shadow 0.15s;
+  }
+  .location-card:hover { box-shadow: var(--shadow-lg); text-decoration: none; }
+  .location-card .thumb { aspect-ratio: 16 / 10; }
+  .location-card .body { padding: 12px 16px 16px; }
+  .location-card h3 { font-size: 18px; }
+  .location-card p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+
+  .mini-card {
+    display: flex; flex-direction: column; border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; background: #fff; color: var(--text);
+  }
+  .mini-card:hover { box-shadow: var(--shadow); text-decoration: none; }
+  .mini-card .thumb { aspect-ratio: 4 / 3; }
+  .mini-card .body { padding: 12px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+  .mini-card h3 { font-size: 16px; font-weight: 700; }
+  .mini-card .price { margin-top: auto; padding-top: 8px; text-align: right; font-weight: 700; font-size: 16px; }
+  .mini-card .price small { font-weight: 400; color: var(--muted); font-size: 12px; }
+
+  .steps { counter-reset: step; }
+  .step {
+    display: flex; gap: 16px; padding: 20px; border: 1px solid var(--border);
+    border-radius: var(--radius); background: #fff;
+  }
+  .step .num {
+    display: grid; place-items: center; width: 40px; height: 40px; flex: none;
+    border-radius: 50%; background: var(--blue-light); color: var(--blue); font-weight: 800; font-size: 18px;
+  }
+  .step h3 { font-size: 16px; margin-bottom: 4px; }
+  .step p { margin: 0; color: var(--muted); }
+
+  /* ---------- タグ・バッジ ---------- */
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+    border: 1px solid var(--border); border-radius: 4px; font-size: 12px; color: var(--text);
+    background: #fff;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+    border-radius: 4px; font-size: 12px; font-weight: 700; white-space: nowrap;
+  }
+  .badge-held { background: var(--orange-bg); color: var(--orange); }
+  .badge-confirmed { background: var(--green-bg); color: var(--green); }
+  .badge-cancelled { background: var(--red-bg); color: var(--red); }
+  .badge-expired { background: var(--gray-bg); color: var(--muted); }
+  .badge-admin { background: var(--navy); color: #fff; }
+  .badge-member { background: var(--blue-light); color: var(--blue); }
+  .badge-inactive { background: var(--gray-bg); color: var(--muted); }
+  .score {
+    display: inline-grid; place-items: center; min-width: 32px; height: 32px; padding: 0 6px;
+    border-radius: 6px 6px 6px 0; background: var(--navy); color: #fff; font-weight: 700;
+  }
+  .ok-text { color: var(--green); font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+  .ng-text { color: var(--red); font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+
+  /* ---------- 検索結果 ---------- */
+  .breadcrumbs { display: flex; flex-wrap: wrap; gap: 6px; padding: 16px 0 8px; font-size: 13px; color: var(--muted); }
+  .breadcrumbs a { color: var(--blue); }
+  .layout-side { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 24px; align-items: start; padding-bottom: 48px; }
+  .filters { border: 1px solid var(--border); border-radius: var(--radius); background: #fff; }
+  .filters h2 { font-size: 16px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .filter-group { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .filter-group:last-child { border-bottom: 0; }
+  .filter-group h3 { font-size: 14px; margin-bottom: 6px; }
+  .range-out { font-weight: 600; }
+  .filters input[type=range] { width: 100%; accent-color: var(--blue); }
+
+  .result-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .result-head h1 { font-size: 24px; }
+  .sort-tabs { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; padding: 2px; background: #fff; }
+  .sort-tabs button {
+    border: 0; background: none; padding: 6px 14px; border-radius: 999px; cursor: pointer; font-size: 13px;
+  }
+  .sort-tabs button[aria-pressed=true] { background: var(--blue-light); color: var(--blue); font-weight: 700; }
+
+  .room-card {
+    display: grid; grid-template-columns: 220px 1fr 200px; gap: 16px; padding: 16px;
+    border: 1px solid var(--border); border-radius: var(--radius); background: #fff; margin-bottom: 16px;
+  }
+  .room-card:hover { box-shadow: var(--shadow); }
+  .room-card .thumb { border-radius: var(--radius); aspect-ratio: 1 / 1; }
+  .room-card .info { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .room-card h2 { font-size: 20px; font-weight: 700; }
+  .room-card h2 a { color: var(--blue); }
+  .room-card .loc { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 13px; }
+  .room-card .loc a { text-decoration: underline; }
+  .room-card .meta { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--text); font-size: 13px; }
+  .room-card .meta span { display: inline-flex; align-items: center; gap: 4px; }
+  .room-card .aside {
+    display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between;
+    gap: 8px; text-align: right; border-left: 1px solid var(--border); padding-left: 16px;
+  }
+  .room-card .aside .top { display: flex; align-items: center; gap: 8px; }
+  .room-card .aside .top small { display: block; font-size: 12px; color: var(--muted); }
+  .price-big { font-size: 22px; font-weight: 700; }
+  .price-note { font-size: 12px; color: var(--muted); }
+
+  .empty {
+    text-align: center; padding: 48px 16px; border: 1px dashed var(--border-strong);
+    border-radius: var(--radius); color: var(--muted);
+  }
+  .empty h2 { color: var(--text); font-size: 18px; margin-bottom: 4px; }
+
+  .skeleton {
+    background: linear-gradient(90deg, #eee 25%, #f6f6f6 50%, #eee 75%);
+    background-size: 200% 100%; animation: shimmer 1.2s infinite; border-radius: var(--radius);
+  }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+
+  /* ---------- 会議室詳細 ---------- */
+  .room-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px; }
+  .room-head h1 { font-size: 26px; font-weight: 700; }
+  .room-head .addr { display: flex; align-items: center; gap: 4px; margin-top: 6px; font-size: 14px; }
+  .gallery { display: grid; grid-template-columns: 2fr 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 8px; height: 320px; margin-bottom: 24px; }
+  .gallery .thumb { border-radius: var(--radius); }
+  .gallery .thumb:first-child { grid-row: span 2; }
+  .gallery .thumb:first-child svg { max-width: 120px; }
+  .room-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 24px; align-items: start; padding-bottom: 48px; }
+  .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+  .fact { display: flex; gap: 10px; align-items: center; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); }
+  .fact .icon { color: var(--blue); width: 24px; height: 24px; }
+  .fact small { display: block; color: var(--muted); font-size: 12px; }
+  .fact strong { font-size: 15px; }
+  .panel { border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; background: #fff; }
+  .panel + .panel { margin-top: 16px; }
+  .panel h2 { font-size: 20px; margin-bottom: 12px; }
+  .equip-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 16px; margin: 0; padding: 0; list-style: none; }
+  .equip-list li { display: flex; align-items: center; gap: 8px; }
+  .equip-list .icon { color: var(--green); }
+
+  .date-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .date-nav .input { width: auto; }
+  .timeline-wrap { overflow-x: auto; padding-bottom: 4px; }
+  .timeline { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(28px, 1fr); gap: 2px; min-width: 560px; }
+  .slot {
+    height: 44px; border: 0; border-radius: 3px; background: var(--green-bg);
+    cursor: pointer; position: relative; padding: 0;
+  }
+  .slot:hover:not(:disabled) { background: #c6f3cb; }
+  .slot.booked { background: repeating-linear-gradient(45deg, #e4e4e4, #e4e4e4 4px, #eeeeee 4px, #eeeeee 8px); cursor: not-allowed; }
+  .slot.past { background: var(--gray-bg); cursor: not-allowed; }
+  .slot.selected { background: var(--blue); }
+  .slot:focus-visible { outline: 2px solid var(--navy); outline-offset: 1px; }
+  .timeline-labels { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(28px, 1fr); gap: 2px; min-width: 560px; font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .timeline-labels span { white-space: nowrap; overflow: visible; }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .legend i { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; }
+
+  .booking-panel { position: sticky; top: 16px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); background: #fff; }
+  .booking-panel .bp-head { background: var(--blue-light); padding: 12px 16px; }
+  .booking-panel .bp-head strong { font-size: 20px; }
+  .booking-panel form { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .summary { border-top: 1px solid var(--border); padding-top: 12px; display: flex; flex-direction: column; gap: 4px; }
+  .summary div { display: flex; justify-content: space-between; gap: 8px; }
+  .summary .total { font-size: 18px; font-weight: 700; margin-top: 4px; }
+  .form-error { color: var(--red); font-size: 13px; }
+
+  /* ---------- 予約一覧 ---------- */
+  .page-title { font-size: 28px; font-weight: 700; padding: 24px 0 16px; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; overflow-x: auto; }
+  .tabs button {
+    border: 0; background: none; padding: 12px 16px; cursor: pointer; font-weight: 500;
+    border-bottom: 3px solid transparent; white-space: nowrap; color: var(--text);
+  }
+  .tabs button[aria-selected=true] { border-bottom-color: var(--blue); color: var(--blue); font-weight: 700; }
+  .tabs .count { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; background: var(--gray-bg); font-size: 12px; }
+  .resv-card {
+    display: grid; grid-template-columns: 120px 1fr auto; gap: 16px; align-items: center;
+    padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 12px; background: #fff;
+  }
+  .resv-card .thumb { border-radius: var(--radius); aspect-ratio: 1 / 1; }
+  .resv-card h2 { font-size: 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .resv-card .when { font-size: 15px; font-weight: 600; margin-top: 4px; }
+  .resv-card .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .resv-card .actions { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+  .hold-note { color: var(--orange); font-size: 13px; font-weight: 600; margin-top: 4px; }
+
+  /* ---------- モーダル・トースト・お知らせ ---------- */
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px;
+    background: rgba(0, 0, 0, 0.5);
+  }
+  .modal {
+    width: 100%; max-width: 520px; max-height: calc(100vh - 32px); overflow: auto;
+    background: #fff; border-radius: var(--radius); box-shadow: var(--shadow-lg);
+  }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+  .modal-head h2 { font-size: 18px; }
+  .modal-close { border: 0; background: none; cursor: pointer; padding: 4px; border-radius: 4px; color: var(--muted); }
+  .modal-close:hover { background: var(--gray-bg); }
+  .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+  .countdown { font-size: 36px; font-weight: 800; color: var(--orange); font-variant-numeric: tabular-nums; text-align: center; }
+  .result-icon { display: grid; place-items: center; width: 56px; height: 56px; margin: 0 auto; border-radius: 50%; background: var(--green-bg); color: var(--green); }
+  .result-icon .icon { width: 32px; height: 32px; }
+  .kv { display: grid; grid-template-columns: 96px 1fr; gap: 6px 12px; margin: 0; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; font-weight: 600; }
+
+  .toast-area { position: fixed; z-index: 60; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; width: max-content; max-width: calc(100vw - 32px); }
+  .toast { padding: 12px 16px; border-radius: var(--radius); background: #1a1a1a; color: #fff; box-shadow: var(--shadow-lg); font-size: 14px; }
+  .toast.error { background: var(--red); }
+  .toast.success { background: var(--green); }
+
+  .notice {
+    display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; margin: 12px 0;
+    border-radius: var(--radius); background: var(--orange-bg); color: var(--orange); font-size: 13px;
+  }
+  .notice.info { background: var(--blue-light); color: var(--navy); }
+  .notice.error { background: var(--red-bg); color: var(--red); }
+  .notice button { margin-left: auto; border: 0; background: none; cursor: pointer; color: inherit; padding: 0 4px; }
+
+  /* ---------- フッター ---------- */
+  .site-footer { background: var(--navy); color: #fff; margin-top: 32px; }
+  .site-footer .inner { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 24px 16px; font-size: 13px; }
+  .site-footer a { color: #fff; }
+  .site-footer nav { display: flex; gap: 16px; flex-wrap: wrap; }
+
+  /* ---------- 管理画面 ---------- */
+  .admin-body { background: var(--bg-alt); }
+  .admin-shell { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh; }
+  .admin-side { background: var(--navy-dark); color: #fff; padding: 16px 12px; display: flex; flex-direction: column; gap: 16px; }
+  .admin-side .brand { padding: 4px 8px; font-size: 20px; }
+  .admin-nav { display: flex; flex-direction: column; gap: 2px; }
+  .admin-nav a {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 6px;
+    color: rgba(255, 255, 255, 0.85); font-weight: 500;
+  }
+  .admin-nav a:hover { background: rgba(255, 255, 255, 0.08); text-decoration: none; color: #fff; }
+  .admin-nav a[aria-current=page] { background: var(--blue); color: #fff; }
+  .admin-side .foot { margin-top: auto; font-size: 12px; opacity: 0.7; padding: 0 8px; }
+  .admin-main { min-width: 0; }
+  .admin-top {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: #fff; border-bottom: 1px solid var(--border); padding: 12px 24px; min-height: 60px;
+  }
+  .admin-top h1 { font-size: 20px; }
+  .admin-top .right { display: flex; align-items: center; gap: 12px; }
+  .admin-content { padding: 24px; }
+  .menu-toggle { display: none; border: 0; background: none; cursor: pointer; padding: 6px; }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .stat small { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .stat strong { display: block; font-size: 28px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .stat .delta { font-size: 12px; color: var(--muted); }
+
+  .card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); }
+  .card-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .card-head h2 { font-size: 16px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .toolbar .input, .toolbar .select { width: auto; min-height: 36px; padding: 6px 10px; }
+  .table-wrap { overflow-x: auto; }
+  .table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .table th, .table td { padding: 10px 16px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .table th { background: var(--bg-alt); font-weight: 600; color: var(--muted); font-size: 12px; }
+  .table tbody tr:hover { background: #fafafa; }
+  .table td.num, .table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .table .actions { display: flex; gap: 4px; justify-content: flex-end; }
+  .table .actions .btn { min-height: 30px; padding: 4px 10px; font-size: 13px; }
+  .table .empty-row td { text-align: center; color: var(--muted); padding: 32px; }
+  .switch { position: relative; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+  .switch input { appearance: none; width: 36px; height: 20px; border-radius: 999px; background: #ccc; position: relative; cursor: pointer; margin: 0; transition: background 0.15s; }
+  .switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform 0.15s; }
+  .switch input:checked { background: var(--green); }
+  .switch input:checked::after { transform: translateX(16px); }
+  .chip-select { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip-select label { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--border-strong); border-radius: 999px; cursor: pointer; font-size: 13px; }
+  .chip-select input { accent-color: var(--blue); margin: 0; }
+  .chip-select label:has(input:checked) { border-color: var(--blue); background: var(--blue-light); color: var(--blue); }
+
+  /* ---------- ログイン ---------- */
+  .auth-page { min-height: 100vh; display: flex; flex-direction: column; background: var(--bg-alt); }
+  .auth-page main { flex: 1; display: grid; place-items: center; padding: 32px 16px; }
+  .auth-card { width: 100%; max-width: 420px; background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 32px; }
+  .auth-card h1 { font-size: 24px; margin: 16px 0 6px; }
+  .auth-card p { margin: 0 0 20px; color: var(--muted); }
+  .auth-card .google-btn {
+    display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
+    min-height: 48px; border: 1px solid var(--border-strong); border-radius: 4px; background: #fff;
+    color: var(--text); font-weight: 600; font-size: 15px;
+  }
+  .auth-card .google-btn:hover { background: var(--bg-alt); text-decoration: none; }
+  .auth-card .divider { display: flex; align-items: center; gap: 12px; margin: 20px 0; color: var(--muted); font-size: 12px; }
+  .auth-card .divider::before, .auth-card .divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .auth-card ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+  .auth-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--navy); color: #fff; font-size: 12px; font-weight: 700; }
+
+  /* ---------- レスポンシブ ---------- */
+  @media (max-width: 960px) {
+    .grid-4 { grid-template-columns: repeat(2, 1fr); }
+    .layout-side { grid-template-columns: minmax(0, 1fr); }
+    .room-layout { grid-template-columns: minmax(0, 1fr); }
+    .booking-panel { position: static; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .admin-shell { grid-template-columns: minmax(0, 1fr); }
+    .admin-side { position: fixed; z-index: 40; inset: 0 auto 0 0; width: 240px; transform: translateX(-100%); transition: transform 0.2s; }
+    .admin-side.open { transform: none; box-shadow: var(--shadow-lg); }
+    .menu-toggle { display: inline-grid; }
+  }
+  @media (max-width: 760px) {
+    .hero { padding: 24px 0 64px; }
+    .hero h1 { font-size: 28px; }
+    .hero p { font-size: 16px; }
+    .searchbar { flex-direction: column; }
+    .searchbar .btn { width: 100%; }
+    .grid-3 { grid-template-columns: 1fr; }
+    .room-card { grid-template-columns: 110px 1fr; }
+    .room-card .aside { grid-column: 1 / -1; flex-direction: row; align-items: center; border-left: 0; padding-left: 0; border-top: 1px solid var(--border); padding-top: 12px; text-align: left; }
+    .room-card h2 { font-size: 17px; }
+    .gallery { grid-template-columns: 1fr 1fr; grid-template-rows: 160px 80px; height: auto; }
+    .gallery .thumb:first-child { grid-row: auto; grid-column: span 2; }
+    .gallery .thumb:nth-child(n+4) { display: none; }
+    .facts { grid-template-columns: 1fr; }
+    .equip-list { grid-template-columns: 1fr; }
+    .resv-card { grid-template-columns: 72px 1fr; }
+    .resv-card .actions { grid-column: 1 / -1; flex-direction: row; }
+    .resv-card .actions .btn { flex: 1; }
+    .header-link .label, .header-user .label, .admin-top .user-name, .admin-top .badge-admin { display: none; }
+    .header-nav { gap: 0; }
+    .header-link { padding: 8px; }
+    .admin-top h1 { font-size: 18px; white-space: nowrap; }
+    .brand small { display: none; }
+    .admin-content { padding: 16px; }
+    .admin-top { padding: 12px 16px; }
+    .form-row { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 480px) {
+    .grid-4 { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: 1fr 1fr; }
+    .stat strong { font-size: 22px; }
+  }
+</style>
+{{ end }}
+
+{{ define "icons" }}
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="i-building" viewBox="0 0 24 24"><path d="M4 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v5h3a1 1 0 0 1 1 1v11h1v2H2v-2h2Zm2 0h4v-3h2v3h2V5H6v16Zm10 0h2v-10h-2v10ZM8 7h2v2H8V7Zm0 4h2v2H8v-2Zm4-4h0v0Zm0 0h2v2h-2V7Zm0 4h2v2h-2v-2Z"/></symbol>
+  <symbol id="i-room" viewBox="0 0 24 24"><path d="M4 18v-6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6h-2v3h-2v-3H8v3H6v-3H4Zm2-2h12v-4H6v4Zm1-9V4h10v3h-2V6H9v1H7Z"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 22s-7-6.1-7-12a7 7 0 0 1 14 0c0 5.9-7 12-7 12Zm0-9.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M7 2h2v2h6V2h2v2h3a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3V2Zm12 8H5v9h14v-9ZM5 8h14V6H5v2Z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><path d="M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20Zm0-2a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm1-8h4v2h-6V7h2v5Z"/></symbol>
+  <symbol id="i-people" viewBox="0 0 24 24"><path d="M9 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-2a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm8 3a3 3 0 1 1 0-6 3 3 0 0 1 0 6ZM1 20v-1a6 6 0 0 1 12 0v1h-2v-1a4 4 0 0 0-8 0v1H1Zm14 0v-1a6 6 0 0 0-1.1-3.5A4.5 4.5 0 0 1 23 19v1h-2v-1a2.5 2.5 0 0 0-4-2v3h-2Z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><path d="M10 2a8 8 0 0 1 6.3 12.9l5.4 5.4-1.4 1.4-5.4-5.4A8 8 0 1 1 10 2Zm0 2a6 6 0 1 0 0 12 6 6 0 0 0 0-12Z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m9 16.2-4.2-4.2-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2Z"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="m12 10.6 4.9-5 1.5 1.5-5 4.9 5 4.9-1.5 1.5-4.9-5-4.9 5-1.5-1.5 5-4.9-5-4.9 1.5-1.5 4.9 5Z"/></symbol>
+  <symbol id="i-yen" viewBox="0 0 24 24"><path d="M7.4 3 12 10.3 16.6 3H19l-5 8h3v2h-4v2h4v2h-4v4h-2v-4H7v-2h4v-2H7v-2h3L5 3h2.4Z"/></symbol>
+  <symbol id="i-screen" viewBox="0 0 24 24"><path d="M3 4h18a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-8v2h4v2H7v-2h4v-2H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm1 2v9h16V6H4Z"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 4h13v2H8V4ZM3 3.5h3v3H3v-3Zm0 7h3v3H3v-3Zm0 7h3v3H3v-3ZM8 11h13v2H8v-2Zm0 7h13v2H8v-2Z"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><path d="M4 22a8 8 0 1 1 16 0h-2a6 6 0 0 0-12 0H4Zm8-9a6 6 0 1 1 0-12 6 6 0 0 1 0 12Zm0-2a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M5 22a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v3h-2V4H6v16h12v-2h2v3a1 1 0 0 1-1 1H5Zm13-6v-3h-7v-2h7V8l5 4-5 4Z"/></symbol>
+  <symbol id="i-dashboard" viewBox="0 0 24 24"><path d="M13 21V11h8v10h-8ZM3 13V3h8v10H3Zm6-2V5H5v6h4ZM3 21v-6h8v6H3Zm2-2h4v-2H5v2Zm10 0h4v-6h-4v6ZM13 3h8v6h-8V3Zm2 2v2h4V5h-4Z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 1 8.2 1.8a1 1 0 0 1 .8 1V13.9a6 6 0 0 1-2.7 5L12 23l-6.3-4.2a6 6 0 0 1-2.7-5V3.8a1 1 0 0 1 .8-1L12 1Zm0 2L5 4.6v9.2a4 4 0 0 0 1.8 3.4l5.2 3.4 5.2-3.4a4 4 0 0 0 1.8-3.4V4.6L12 3Z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2h6Z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M3 4h18v2H3V4Zm0 7h18v2H3v-2Zm0 7h18v2H3v-2Z"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><path d="M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20Zm0-2a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM11 7h2v2h-2V7Zm0 4h2v6h-2v-6Z"/></symbol>
+</svg>
+{{ end }}
+
+{{ define "header" }}
+<header class="site-header">
+  <div class="container bar">
+    <a class="brand" href="/">RoomBook<small>会議室予約</small></a>
+    <nav class="header-nav" aria-label="メインメニュー">
+      <a class="header-link" href="/search"><svg class="icon"><use href="#i-search"/></svg><span class="label">会議室を探す</span></a>
+      <a class="header-link" href="/reservations"><svg class="icon"><use href="#i-list"/></svg><span class="label">予約一覧</span></a>
+      {{ if .isAdmin }}
+      <a class="header-link" href="/admin"><svg class="icon"><use href="#i-dashboard"/></svg><span class="label">管理画面</span></a>
+      {{ end }}
+      {{ if .userName }}
+      <span class="header-user"><span class="avatar" aria-hidden="true"><svg class="icon icon-sm"><use href="#i-user"/></svg></span><span class="label">{{ .userName }}</span></span>
+      <a class="header-link" href="/logout" title="ログアウト"><svg class="icon"><use href="#i-logout"/></svg><span class="visually-hidden">ログアウト</span></a>
+      {{ else }}
+      <a class="btn btn-light" href="/login">ログイン</a>
+      {{ end }}
+    </nav>
+  </div>
+</header>
+{{ end }}
+
+{{/* 検索バー。トップページと検索結果ページで共通。値の設定は App.initSearchbar() で行う */}}
+{{ define "searchbar" }}
+<form class="searchbar" action="/search" method="get" role="search" data-searchbar>
+  <div class="sb-field wide">
+    <svg class="icon"><use href="#i-building"/></svg>
+    <label>
+      <small>拠点</small>
+      <select name="location_id" aria-label="拠点">
+        <option value="">すべての拠点</option>
+      </select>
+    </label>
+  </div>
+  <div class="sb-field">
+    <svg class="icon"><use href="#i-calendar"/></svg>
+    <label>
+      <small>利用日</small>
+      <input type="date" name="date" aria-label="利用日" required />
+    </label>
+  </div>
+  <div class="sb-field">
+    <svg class="icon"><use href="#i-clock"/></svg>
+    <label>
+      <small>時間</small>
+      <span class="time-pair">
+        <select name="start" aria-label="開始時刻"></select>
+        <span aria-hidden="true">〜</span>
+        <select name="end" aria-label="終了時刻"></select>
+      </span>
+    </label>
+  </div>
+  <div class="sb-field">
+    <svg class="icon"><use href="#i-people"/></svg>
+    <label>
+      <small>人数</small>
+      <input type="number" name="attendees" min="1" max="200" value="1" aria-label="人数" />
+    </label>
+  </div>
+  <button class="btn btn-primary" type="submit">検索</button>
+</form>
+{{ end }}
+
+{{ define "footer" }}
+<footer class="site-footer">
+  <div class="container inner">
+    <span>&copy; RoomBook 会議室予約システム</span>
+    <nav aria-label="フッター">
+      <a href="/search">会議室を探す</a>
+      <a href="/reservations">予約一覧</a>
+      <a href="/admin/login">管理者ログイン</a>
+    </nav>
+  </div>
+</footer>
+<div class="toast-area" id="toast-area" aria-live="polite"></div>
+{{ end }}
+
+{{/*
+  共通 JavaScript。
+  バックエンド未実装の段階でも画面を確認できるよう、API 呼び出しに失敗したら
+  サンプルデータで表示し、画面上部に「サンプルデータ表示中」と出す。
+
+  想定している API(レスポンスはすべて JSON)
+  ---------------------------------------------------------------
+  利用者向け
+    GET  /api/locations                               拠点一覧
+    GET  /api/equipment                               設備一覧
+    GET  /api/rooms/search?location_id=&date=&start=&end=&attendees=
+                                                      会議室検索(指定時間に空いているかを available で返す)
+    GET  /api/rooms/:id                               会議室詳細(location, equipment を含む)
+    GET  /api/rooms/:id/availability?date=YYYY-MM-DD  その日の予約済み時間帯 [{start_at, end_at}]
+    POST /api/reservations                            仮押さえ(HELD)作成。Idempotency-Key ヘッダー付き
+    POST /api/reservations/:id/confirm                仮押さえを確定(CONFIRMED)
+    POST /api/reservations/:id/cancel                 キャンセル(CANCELLED)
+    GET  /api/me/reservations                         自分の予約一覧
+  管理者向け
+    GET  /api/admin/stats
+    GET  /api/admin/reservations?date=&location_id=&status=
+    POST /api/admin/reservations/:id/cancel
+    GET  /api/admin/rooms       POST /api/admin/rooms       PUT /api/admin/rooms/:id
+    GET  /api/admin/locations   POST /api/admin/locations   PUT /api/admin/locations/:id
+    GET  /api/admin/users       PUT  /api/admin/users/:id/role
+  ---------------------------------------------------------------
+  日時は ISO 8601(例: 2026-09-28T10:00:00+09:00)でやり取りする。
+*/}}
+{{ define "app_js" }}
+<script>
+  (function () {
+    "use strict";
+
+    // ---------- API ----------
+    class ApiError extends Error {
+      constructor(message, status) {
+        super(message);
+        this.status = status;
+      }
+    }
+
+    async function api(path, options) {
+      const opts = options || {};
+      const headers = Object.assign({ Accept: "application/json" }, opts.headers || {});
+      if (opts.body !== undefined) headers["Content-Type"] = "application/json";
+      let res;
+      try {
+        res = await fetch(path, {
+          method: opts.method || "GET",
+          headers: headers,
+          body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+          credentials: "same-origin",
+        });
+      } catch (e) {
+        throw new ApiError("サーバーに接続できませんでした", 0);
+      }
+      if (res.status === 401) {
+        throw new ApiError("ログインが必要です", 401);
+      }
+      if (!res.ok) {
+        let message = "エラーが発生しました (HTTP " + res.status + ")";
+        try {
+          const data = await res.json();
+          if (data && (data.error || data.message)) message = data.error || data.message;
+        } catch (_) { /* JSON でないレスポンスは無視 */ }
+        throw new ApiError(message, res.status);
+      }
+      if (res.status === 204) return null;
+      const type = res.headers.get("Content-Type") || "";
+      if (!type.includes("application/json")) {
+        throw new ApiError("JSON 以外のレスポンスが返されました", 501);
+      }
+      return res.json();
+    }
+
+    // バックエンドがまだ無い(接続失敗・404・405・501)場合だけ true
+    function isNotImplemented(err) {
+      return err instanceof ApiError && [0, 404, 405, 501].includes(err.status);
+    }
+
+    let demoMode = false;
+    function enableDemo() {
+      if (demoMode) return;
+      demoMode = true;
+      const host = document.querySelector("[data-demo-notice]");
+      if (!host) return;
+      const box = document.createElement("div");
+      box.className = "notice";
+      box.innerHTML =
+        '<svg class="icon icon-sm"><use href="#i-info"/></svg>' +
+        "<span>バックエンドに接続できないため、サンプルデータを表示しています。</span>" +
+        '<button type="button" aria-label="閉じる">&times;</button>';
+      box.querySelector("button").addEventListener("click", function () { box.remove(); });
+      host.appendChild(box);
+    }
+
+    // GET 用。失敗したらサンプルデータを返す
+    async function load(path, sample) {
+      try {
+        return await api(path);
+      } catch (err) {
+        console.warn("[api] " + path + ": " + err.message);
+        if (err.status === 401 && !path.startsWith("/api/admin")) {
+          toast("ログインすると自分の予約が表示されます", "error");
+        }
+        enableDemo();
+        return typeof sample === "function" ? sample() : JSON.parse(JSON.stringify(sample));
+      }
+    }
+
+    // POST/PUT 用。未実装のときだけ fallback() の結果を成功扱いにする
+    async function send(path, method, body, fallback, headers) {
+      try {
+        return await api(path, { method: method, body: body, headers: headers });
+      } catch (err) {
+        if (isNotImplemented(err) && fallback) {
+          console.warn("[api] " + method + " " + path + ": " + err.message + "(サンプル動作)");
+          enableDemo();
+          return fallback();
+        }
+        throw err;
+      }
+    }
+
+    function uuid() {
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+      return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+        const r = (Math.random() * 16) | 0;
+        return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+      });
+    }
+
+    // ---------- 表示用ユーティリティ ----------
+    function esc(value) {
+      return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    const yenFmt = new Intl.NumberFormat("ja-JP");
+    function yen(n) { return "¥" + yenFmt.format(Math.round(n || 0)); }
+
+    const WEEK = ["日", "月", "火", "水", "木", "金", "土"];
+    function pad(n) { return String(n).padStart(2, "0"); }
+    function ymd(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+    function hm(d) { return pad(d.getHours()) + ":" + pad(d.getMinutes()); }
+    function fmtDate(d) {
+      const x = typeof d === "string" ? parseYmd(d) : d;
+      return x.getFullYear() + "/" + pad(x.getMonth() + 1) + "/" + pad(x.getDate()) + "(" + WEEK[x.getDay()] + ")";
+    }
+    function parseYmd(s) {
+      const p = s.split("-").map(Number);
+      return new Date(p[0], p[1] - 1, p[2]);
+    }
+    function addDays(s, n) {
+      const d = parseYmd(s);
+      d.setDate(d.getDate() + n);
+      return ymd(d);
+    }
+    function today() { return ymd(new Date()); }
+    // "HH:MM" <-> 分
+    function toMin(t) { const p = t.split(":").map(Number); return p[0] * 60 + p[1]; }
+    function fromMin(m) { return pad(Math.floor(m / 60)) + ":" + pad(m % 60); }
+    // 拠点のタイムゾーンは現状 Asia/Tokyo 固定の想定
+    function iso(date, time) { return date + "T" + time + ":00+09:00"; }
+    function fmtRange(startIso, endIso) {
+      const s = new Date(startIso), e = new Date(endIso);
+      return fmtDate(s) + " " + hm(s) + "〜" + hm(e);
+    }
+    function hours(start, end) { return (toMin(end) - toMin(start)) / 60; }
+
+    // 30分刻みの時刻リスト
+    function timeOptions(open, close, selected) {
+      let html = "";
+      for (let m = toMin(open || "08:00"); m <= toMin(close || "22:00"); m += 30) {
+        const t = fromMin(m);
+        html += '<option value="' + t + '"' + (t === selected ? " selected" : "") + ">" + t + "</option>";
+      }
+      return html;
+    }
+
+    // 次の30分区切り(営業時間外なら翌営業日の開始)
+    function defaultSlot() {
+      const now = new Date();
+      let m = now.getHours() * 60 + now.getMinutes();
+      m = Math.ceil((m + 1) / 30) * 30;
+      let date = today();
+      if (m < toMin("08:00")) m = toMin("08:00");
+      if (m + 60 > toMin("22:00")) { date = addDays(date, 1); m = toMin("09:00"); }
+      return { date: date, start: fromMin(m), end: fromMin(m + 60) };
+    }
+
+    const STATUS = {
+      HELD: { label: "仮押さえ", cls: "badge-held" },
+      CONFIRMED: { label: "確定", cls: "badge-confirmed" },
+      CANCELLED: { label: "キャンセル", cls: "badge-cancelled" },
+      EXPIRED: { label: "期限切れ", cls: "badge-expired" },
+    };
+    function statusBadge(s) {
+      const x = STATUS[s] || { label: s, cls: "badge-expired" };
+      return '<span class="badge ' + x.cls + '">' + esc(x.label) + "</span>";
+    }
+
+    // 会議室ごとに色が変わるサムネイル
+    const PALETTES = [
+      ["#5b8def", "#003b95"], ["#2fb59a", "#0b6e5c"], ["#f5a524", "#b45309"],
+      ["#9b7bea", "#4c2a9e"], ["#ef6f6c", "#9f1c1a"], ["#4ab7e0", "#075985"],
+    ];
+    function thumb(seed, label, icon) {
+      let h = 0;
+      const s = String(seed || "");
+      for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+      const p = PALETTES[h % PALETTES.length];
+      return '<div class="thumb" style="--thumb-a:' + p[0] + ";--thumb-b:" + p[1] + '">' +
+        '<svg aria-hidden="true"><use href="#' + (icon || "i-room") + '"/></svg>' +
+        (label ? '<span class="thumb-label">' + esc(label) + "</span>" : "") + "</div>";
+    }
+
+    function icon(name, cls) {
+      return '<svg class="icon ' + (cls || "") + '" aria-hidden="true"><use href="#' + name + '"/></svg>';
+    }
+
+    // ---------- トースト・モーダル ----------
+    function toast(message, type) {
+      const area = document.getElementById("toast-area");
+      if (!area) return;
+      const el = document.createElement("div");
+      el.className = "toast " + (type || "");
+      el.setAttribute("role", type === "error" ? "alert" : "status");
+      el.textContent = message;
+      area.appendChild(el);
+      setTimeout(function () { el.remove(); }, 4000);
+    }
+
+    // body/foot は HTML 文字列。戻り値の close() で閉じる
+    function modal(opts) {
+      const back = document.createElement("div");
+      back.className = "modal-backdrop";
+      back.innerHTML =
+        '<div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">' +
+        '<div class="modal-head"><h2 id="modal-title">' + esc(opts.title) + "</h2>" +
+        (opts.dismissible === false ? "" : '<button type="button" class="modal-close" data-close aria-label="閉じる">' + icon("i-x") + "</button>") +
+        "</div>" +
+        '<div class="modal-body">' + opts.body + "</div>" +
+        (opts.foot ? '<div class="modal-foot">' + opts.foot + "</div>" : "") +
+        "</div>";
+      const prevFocus = document.activeElement;
+      function close() {
+        back.remove();
+        document.removeEventListener("keydown", onKey);
+        if (opts.onClose) opts.onClose();
+        if (prevFocus && prevFocus.focus) prevFocus.focus();
+      }
+      function onKey(e) { if (e.key === "Escape" && opts.dismissible !== false) close(); }
+      back.addEventListener("click", function (e) {
+        if (e.target === back && opts.dismissible !== false) close();
+        if (e.target.closest("[data-close]")) close();
+      });
+      document.addEventListener("keydown", onKey);
+      document.body.appendChild(back);
+      const first = back.querySelector("input, select, textarea, button:not([data-close])");
+      if (first) first.focus();
+      return { el: back, close: close };
+    }
+
+    function confirmDialog(title, message, okLabel, danger) {
+      return new Promise(function (resolve) {
+        let done = false;
+        const m = modal({
+          title: title,
+          body: "<p style=\"margin:0\">" + esc(message) + "</p>",
+          foot: '<button type="button" class="btn btn-outline" data-close>戻る</button>' +
+            '<button type="button" class="btn ' + (danger ? "btn-danger" : "btn-primary") + '" data-ok>' + esc(okLabel || "OK") + "</button>",
+          onClose: function () { if (!done) resolve(false); },
+        });
+        m.el.querySelector("[data-ok]").addEventListener("click", function () {
+          done = true;
+          resolve(true);
+          m.close();
+        });
+      });
+    }
+
+    // ---------- サンプルデータ ----------
+    const SAMPLE = (function () {
+      const locations = [
+        { id: "loc-nagoya", name: "名古屋本社", address: "愛知県名古屋市中村区名駅1-1-1", timezone: "Asia/Tokyo", open_time: "08:00", close_time: "22:00" },
+        { id: "loc-tokyo", name: "東京オフィス", address: "東京都千代田区丸の内2-2-2", timezone: "Asia/Tokyo", open_time: "08:00", close_time: "22:00" },
+        { id: "loc-osaka", name: "大阪オフィス", address: "大阪府大阪市北区梅田3-3-3", timezone: "Asia/Tokyo", open_time: "09:00", close_time: "20:00" },
+      ];
+      const equipment = [
+        { id: "eq-projector", name: "プロジェクター" },
+        { id: "eq-whiteboard", name: "ホワイトボード" },
+        { id: "eq-monitor", name: "大型モニター" },
+        { id: "eq-web", name: "Web会議システム" },
+        { id: "eq-speaker", name: "スピーカーフォン" },
+      ];
+      function eq() {
+        const ids = Array.prototype.slice.call(arguments);
+        return equipment.filter(function (e) { return ids.includes(e.id.replace("eq-", "")); });
+      }
+      const rooms = [
+        { id: "room-n-101", location_id: "loc-nagoya", name: "会議室A(101)", capacity: 6, hourly_price: 1500, is_active: true, equipment: eq("whiteboard", "monitor") },
+        { id: "room-n-102", location_id: "loc-nagoya", name: "会議室B(102)", capacity: 10, hourly_price: 2500, is_active: true, equipment: eq("projector", "whiteboard", "web") },
+        { id: "room-n-301", location_id: "loc-nagoya", name: "大会議室(301)", capacity: 30, hourly_price: 6000, is_active: true, equipment: eq("projector", "whiteboard", "monitor", "web", "speaker") },
+        { id: "room-n-201", location_id: "loc-nagoya", name: "フォンブース(201)", capacity: 1, hourly_price: 500, is_active: true, equipment: eq("web") },
+        { id: "room-t-1", location_id: "loc-tokyo", name: "Tokyo Room 1", capacity: 4, hourly_price: 2000, is_active: true, equipment: eq("monitor", "web") },
+        { id: "room-t-2", location_id: "loc-tokyo", name: "Tokyo Room 2", capacity: 8, hourly_price: 3500, is_active: true, equipment: eq("projector", "whiteboard", "web") },
+        { id: "room-t-3", location_id: "loc-tokyo", name: "セミナールーム", capacity: 50, hourly_price: 9000, is_active: false, equipment: eq("projector", "monitor", "speaker") },
+        { id: "room-o-1", location_id: "loc-osaka", name: "梅田ルーム", capacity: 12, hourly_price: 3000, is_active: true, equipment: eq("whiteboard", "monitor", "web") },
+      ];
+      rooms.forEach(function (r) {
+        r.location = locations.find(function (l) { return l.id === r.location_id; });
+      });
+
+      // 会議室ごとに決まった時間帯を予約済みにする
+      function bookedFor(roomId, date) {
+        let h = 0;
+        for (let i = 0; i < roomId.length; i++) h = (h + roomId.charCodeAt(i)) % 7;
+        const base = [["10:00", "11:30"], ["13:00", "14:00"], ["15:30", "17:00"], ["09:00", "10:00"], ["18:00", "19:30"]];
+        return [base[h % 5], base[(h + 2) % 5]].map(function (b) {
+          return { start_at: iso(date, b[0]), end_at: iso(date, b[1]) };
+        });
+      }
+
+      function overlaps(roomId, date, start, end) {
+        return bookedFor(roomId, date).some(function (b) {
+          const bs = hm(new Date(b.start_at)), be = hm(new Date(b.end_at));
+          return toMin(start) < toMin(be) && toMin(bs) < toMin(end);
+        });
+      }
+
+      function search(q) {
+        return rooms
+          .filter(function (r) { return r.is_active; })
+          .filter(function (r) { return !q.location_id || r.location_id === q.location_id; })
+          .filter(function (r) { return !q.attendees || r.capacity >= Number(q.attendees); })
+          .map(function (r) {
+            const copy = Object.assign({}, r);
+            copy.available = q.date && q.start && q.end ? !overlaps(r.id, q.date, q.start, q.end) : true;
+            return copy;
+          });
+      }
+
+      const users = [
+        { id: "user-1", name: "山田 太郎", email: "taro@example.com", provider: "google", role: "admin", created_at: "2026-04-01T09:00:00+09:00" },
+        { id: "user-2", name: "佐藤 花子", email: "hanako@example.com", provider: "google", role: "member", created_at: "2026-05-12T10:30:00+09:00" },
+        { id: "user-3", name: "鈴木 一郎", email: "ichiro@example.com", provider: "google", role: "member", created_at: "2026-06-20T14:10:00+09:00" },
+        { id: "user-4", name: "高橋 美咲", email: "misaki@example.com", provider: "google", role: "member", created_at: "2026-08-03T11:45:00+09:00" },
+      ];
+
+      function reservations() {
+        const t = today();
+        const list = [
+          { id: "resv-1", room_id: "room-n-102", user_id: "user-2", title: "週次定例", attendees: 8, date: addDays(t, 1), s: "10:00", e: "11:00", status: "CONFIRMED" },
+          { id: "resv-2", room_id: "room-t-1", user_id: "user-2", title: "1on1", attendees: 2, date: addDays(t, 3), s: "15:00", e: "15:30", status: "HELD" },
+          { id: "resv-3", room_id: "room-n-301", user_id: "user-3", title: "全社説明会", attendees: 25, date: t, s: "13:00", e: "15:00", status: "CONFIRMED" },
+          { id: "resv-4", room_id: "room-o-1", user_id: "user-2", title: "顧客打ち合わせ", attendees: 5, date: addDays(t, -4), s: "14:00", e: "15:00", status: "CONFIRMED" },
+          { id: "resv-5", room_id: "room-n-101", user_id: "user-2", title: "採用面接", attendees: 3, date: addDays(t, 2), s: "09:00", e: "10:00", status: "CANCELLED" },
+          { id: "resv-6", room_id: "room-t-2", user_id: "user-4", title: "企画レビュー", attendees: 6, date: t, s: "16:00", e: "17:30", status: "CONFIRMED" },
+          { id: "resv-7", room_id: "room-n-102", user_id: "user-4", title: "勉強会", attendees: 9, date: addDays(t, -1), s: "18:00", e: "19:00", status: "EXPIRED" },
+        ];
+        return list.map(function (r) {
+          const room = rooms.find(function (x) { return x.id === r.room_id; });
+          const user = users.find(function (u) { return u.id === r.user_id; });
+          return {
+            id: r.id, room_id: r.room_id, user_id: r.user_id, title: r.title, attendees: r.attendees,
+            start_at: iso(r.date, r.s), end_at: iso(r.date, r.e), status: r.status,
+            hold_expires_at: r.status === "HELD" ? new Date(Date.now() + 8 * 60000).toISOString() : null,
+            room: { id: room.id, name: room.name, hourly_price: room.hourly_price },
+            location: { id: room.location.id, name: room.location.name },
+            user: { id: user.id, name: user.name, email: user.email },
+          };
+        });
+      }
+
+      return {
+        locations: locations, equipment: equipment, rooms: rooms, users: users,
+        search: search, bookedFor: bookedFor, reservations: reservations,
+      };
+    })();
+
+    // ---------- 検索バー ----------
+    // params: URLSearchParams(初期値)
+    function initSearchbar(form, locations, params) {
+      const def = defaultSlot();
+      const sel = form.elements.location_id;
+      sel.innerHTML = '<option value="">すべての拠点</option>' + locations.map(function (l) {
+        return '<option value="' + esc(l.id) + '">' + esc(l.name) + "</option>";
+      }).join("");
+      sel.value = params.get("location_id") || "";
+      form.elements.date.value = params.get("date") || def.date;
+      form.elements.date.min = today();
+      form.elements.start.innerHTML = timeOptions("08:00", "21:30", params.get("start") || def.start);
+      form.elements.end.innerHTML = timeOptions("08:30", "22:00", params.get("end") || def.end);
+      form.elements.attendees.value = params.get("attendees") || "1";
+
+      form.elements.start.addEventListener("change", function () {
+        if (toMin(form.elements.end.value) <= toMin(form.elements.start.value)) {
+          form.elements.end.value = fromMin(Math.min(toMin(form.elements.start.value) + 60, toMin("22:00")));
+        }
+      });
+      form.addEventListener("submit", function (e) {
+        if (toMin(form.elements.end.value) <= toMin(form.elements.start.value)) {
+          e.preventDefault();
+          toast("終了時刻は開始時刻より後にしてください", "error");
+          form.elements.end.focus();
+        }
+      });
+    }
+
+    window.App = {
+      initSearchbar: initSearchbar,
+      api: api, load: load, send: send, ApiError: ApiError, isNotImplemented: isNotImplemented, uuid: uuid,
+      esc: esc, yen: yen, pad: pad, ymd: ymd, hm: hm, fmtDate: fmtDate, parseYmd: parseYmd,
+      addDays: addDays, today: today, toMin: toMin, fromMin: fromMin, iso: iso, fmtRange: fmtRange,
+      hours: hours, timeOptions: timeOptions, defaultSlot: defaultSlot, STATUS: STATUS,
+      statusBadge: statusBadge, thumb: thumb, icon: icon, toast: toast, modal: modal,
+      confirmDialog: confirmDialog, SAMPLE: SAMPLE,
+      isDemo: function () { return demoMode; },
+    };
+  })();
+</script>
+{{ end }}

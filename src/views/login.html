@@ -1,65 +1,74 @@
 <!doctype html>
 <html lang="ja">
   <head>
-    <meta httpequiv="ContentType" content="text/html;charset=utf8" />
-    <title id="test">{{ .title }}</title>
-    <!-- <link rel="stylesheet" href="../resources/app.css"> -->
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-      integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC"
-      crossorigin="anonymous"
-    />
-    <link rel="stylesheet" href="../resources/appp.css" />
+    <title>利用者ログイン | RoomBook</title>
+    {{ template "head" . }}
   </head>
-  <body>
-    <main class="form-signin w-100 m-auto">
-      <form>
-        <img
-          class="mb-4"
-          src="../resources/images/gopher.svg"
-          alt=""
-          width="72"
-          height="57"
-          loading="lazy"
-        />
-        <h1 class="h3 mb-3 fw-normal">サインインをどうぞ</h1>
+  <body class="auth-page">
+    {{ template "icons" }}
+    <header class="site-header">
+      <div class="container bar">
+        <a class="brand" href="/">RoomBook<small>管理画面</small></a>
+        <a class="header-link" href="/"><span>利用者向けサイトへ</span></a>
+      </div>
+    </header>
 
-        <div class="form-floating">
-          <input
-            type="email"
-            class="form-control"
-            id="floatingInput"
-            placeholder="name@example.com"
-          />
-          <label for="floatingInput">Emailアドレス</label>
+    <main>
+      <div class="auth-card">
+        <span class="auth-badge"
+          ><svg class="icon icon-sm"><use href="#i-shield" /></svg
+          >一般利用者</span
+        >
+        <h1>一般利用者ログイン</h1>
+        {{/* ログイン失敗時は .error にメッセージを渡すと表示される。 例: 権限が
+        member のユーザーがログインした場合 c.HTML(http.StatusForbidden,
+        "admin_login.html", gin.H{"error": "管理者権限がありません"}) */}} {{ if
+        .error }}
+        <div class="notice error" role="alert">
+          <svg class="icon icon-sm"><use href="#i-info" /></svg>
+          <span>{{ .error }}</span>
         </div>
-        <div class="form-floating">
-          <input
-            type="password"
-            class="form-control"
-            id="floatingPassword"
-            placeholder="パスワード"
-          />
-          <label for="floatingPassword">パスワード</label>
-        </div>
+        {{ end }}
 
-        <div class="form-check mb-3">
-          <label>
-            <input type="checkbox" value="remember-me" /> 状態を記憶する
-          </label>
-        </div>
-        <button class="w-100 btn btn-lg btn-primary" type="submit">
-          ログイン
-        </button>
-        <p class="mt-5 mb-3 text-muted">&copy; 2022</p>
-      </form>
+        <a class="google-btn" href="/auth/google/login" role="button">
+          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+            <path
+              fill="#4285F4"
+              d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.88 2.7-6.62z"
+            />
+            <path
+              fill="#34A853"
+              d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.83.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.96v2.33A9 9 0 0 0 9 18z"
+            />
+            <path
+              fill="#FBBC05"
+              d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.16.28-1.7V4.97H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.03l2.99-2.33z"
+            />
+            <path
+              fill="#EA4335"
+              d="M9 3.58c1.32 0 2.5.46 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.97l2.99 2.33C4.66 5.17 6.65 3.58 9 3.58z"
+            />
+          </svg>
+          Googleでサインイン
+        </a>
+
+        <div class="divider">ご注意</div>
+        <ul>
+          <li>
+            ユーザーの権限(role)が
+            <strong>admin</strong> のアカウントのみログインできます。
+          </li>
+          <li>
+            管理者ユーザーの方は<a href="/admin/login">こちらからログイン</a
+            >してください。
+          </li>
+        </ul>
+      </div>
     </main>
-
-    <script
-      src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
-      integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
-      crossorigin="anonymous"
-    ></script>
+    <footer class="site-footer" style="margin-top: 0">
+      <div class="container inner">
+        <span>&copy; RoomBook 会議室予約システム</span>
+      </div>
+    </footer>
   </body>
 </html>

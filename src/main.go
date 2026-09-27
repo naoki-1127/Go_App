@@ -5,8 +5,11 @@ import (
 	"io"
 	"os"
 
+	"log"
+
 	"github.com/gin-gonic/gin"
-	migrate "github.com/hrs-o/docker-go/models/db"
+	connect "github.com/hrs-o/docker-go/config"
+	"github.com/hrs-o/docker-go/db"
 	"github.com/hrs-o/docker-go/router"
 	"github.com/joho/godotenv"
 )
@@ -19,7 +22,9 @@ func main() {
 	//env 読み込み
 	loadEnv()
 	//migrate
-	migrate.Open()
+	if err := db.Migrate(connect.DatabaseURL()); err != nil {
+		log.Fatalf("migration failed: %v", err)
+	}
 	//route読み込み
 	router.Router()
 

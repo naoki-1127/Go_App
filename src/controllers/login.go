@@ -71,9 +71,21 @@ func AdminLogin(c *gin.Context) {
 	})
 }
 
+// 利用者ログインページからの動線
+func MemberGoogleLogin(c *gin.Context) {
+	role := "member"
+	GoogleLogin(c,role)
+}
+
+// 管理者ログインページからの動線
+func AdminGoogleLogin(c *gin.Context) {
+	role := "admin"
+	GoogleLogin(c,role)
+}
+
 // GoogleLogin は「Googleでサインイン」ボタン押下時に呼ばれ、
 // Google の認可エンドポイントへリダイレクトする。
-func GoogleLogin(c *gin.Context) {
+func GoogleLogin(c *gin.Context,role string){
 	provider, err := getGoogleProvider(c.Request.Context())
 	if err != nil {
 		c.String(http.StatusInternalServerError, "OIDCプロバイダーの初期化に失敗しました: %v", err)
@@ -87,6 +99,7 @@ func GoogleLogin(c *gin.Context) {
 	}
 	// CSRF対策: コールバック時にこの値と突き合わせる。
 	c.SetCookie(oauthStateCookie, state, oauthStateCookieN, "/", "", false, true)
+	c.SetCookie("role", role, oauthStateCookieN, "/", "", false, true)
 
 	config := googleOAuthConfig(provider)
 	c.Redirect(http.StatusFound, config.AuthCodeURL(state))
@@ -98,6 +111,7 @@ func GoogleCallback(c *gin.Context) {
 	ctx := c.Request.Context()
 
 	stateCookie, err := c.Cookie(oauthStateCookie)
+	role, err := c.Cookie("role")
 	if err != nil || stateCookie == "" || stateCookie != c.Query("state") {
 		c.String(http.StatusBadRequest, "不正なstateです")
 		return
@@ -141,7 +155,7 @@ func GoogleCallback(c *gin.Context) {
 	}
 
 	repo := repository.NewPgUserRepository(connect.Pool())
-	user, err := repository.FindOrCreateUser(ctx, repo, "google", claims.Sub, claims.Name, claims.Email)
+	user, err := repository.FindOrCreateUser(ctx, repo, "google", claims.Sub, claims.Name, claims.Email,role)
 	if err != nil {
 		c.String(http.StatusInternalServerError, "ユーザーの作成/取得に失敗しました: %v", err)
 		return

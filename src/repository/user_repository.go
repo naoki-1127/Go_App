@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/google/uuid"
 	"github.com/hrs-o/docker-go/db/sqlc"
 	"github.com/jackc/pgx/v5"
 )
@@ -18,6 +19,7 @@ type User = sqlc.IdentityUser
 // DBを起動しない単体テストが書けるよう、FindOrCreateUser はこのインターフェースに依存する。
 type UserRepository interface {
 	FindByProvider(ctx context.Context, provider, providerUserID string) (*User, error)
+	FindByID(ctx context.Context, id uuid.UUID) (*User, error)
 	Create(ctx context.Context, arg sqlc.CreateUserParams) (*User, error)
 }
 
@@ -35,6 +37,17 @@ func (r *PgUserRepository) FindByProvider(ctx context.Context, provider, provide
 		Provider:       provider,
 		ProviderUserID: providerUserID,
 	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (r *PgUserRepository) FindByID(ctx context.Context, id uuid.UUID) (*User, error) {
+	user, err := r.q.GetUserByID(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrUserNotFound
 	}

@@ -24,6 +24,15 @@ func (f *fakeUserRepository) FindByProvider(ctx context.Context, provider, provi
 	return nil, ErrUserNotFound
 }
 
+func (f *fakeUserRepository) FindByID(ctx context.Context, id uuid.UUID) (*User, error) {
+	for i := range f.users {
+		if f.users[i].ID == id {
+			return &f.users[i], nil
+		}
+	}
+	return nil, ErrUserNotFound
+}
+
 func (f *fakeUserRepository) Create(ctx context.Context, arg sqlc.CreateUserParams) (*User, error) {
 	user := User{
 		ID:             uuid.New(),

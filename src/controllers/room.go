@@ -7,7 +7,7 @@ import (
 )
 
 func GetRoomPage(c *gin.Context){
-	c.HTML(http.StatusOK, "room.html", gin.H{
+	Render(c, http.StatusOK, "room.html", gin.H{
 		"title": "Login",
 	})
 }

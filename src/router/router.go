@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hrs-o/docker-go/controllers"
+	"github.com/hrs-o/docker-go/middleware"
 )
 
 // SetupRouter はルーティング定義だけを行い、*gin.Engine を返す。
@@ -13,8 +14,11 @@ func SetupRouter() *gin.Engine {
 	r := gin.Default()
 	r.Static("/resources", "./resources")
 	r.LoadHTMLGlob("views/*")
+	// ログイン中のユーザー情報を解決し、画面を描画するハンドラから
+	// controllers.Render 経由で userName / isAdmin を参照できるようにする。
+	r.Use(middleware.CurrentUser)
 	r.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "index.html", gin.H{
+		controllers.Render(c, http.StatusOK, "index.html", gin.H{
 			"title": "Main website",
 		})
 	})

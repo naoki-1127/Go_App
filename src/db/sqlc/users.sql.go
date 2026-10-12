@@ -7,6 +7,8 @@ package sqlc
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
 const createUser = `-- name: CreateUser :one
@@ -31,6 +33,27 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (Identit
 		arg.ProviderUserID,
 		arg.Role,
 	)
+	var i IdentityUser
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Name,
+		&i.Provider,
+		&i.ProviderUserID,
+		&i.Role,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getUserByID = `-- name: GetUserByID :one
+SELECT id, email, name, provider, provider_user_id, role, created_at, updated_at FROM identity.users
+WHERE id = $1
+`
+
+func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (IdentityUser, error) {
+	row := q.db.QueryRow(ctx, getUserByID, id)
 	var i IdentityUser
 	err := row.Scan(
 		&i.ID,

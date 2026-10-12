@@ -59,14 +59,14 @@ func randomState() (string, error) {
 
 // Login は /login への GET リクエストに対し、ログインページ(login.html)を表示する。
 func Login(c *gin.Context) {
-	c.HTML(http.StatusOK, "login.html", gin.H{
+	Render(c, http.StatusOK, "login.html", gin.H{
 		"title": "Login",
 	})
 }
 
 // Login は /login への GET リクエストに対し、ログインページ(login.html)を表示する。
 func AdminLogin(c *gin.Context) {
-	c.HTML(http.StatusOK, "admin_login.html", gin.H{
+	Render(c, http.StatusOK, "admin_login.html", gin.H{
 		"title": "Login",
 	})
 }

@@ -7,7 +7,7 @@ import (
 )
 
 func GetReservationPage(c *gin.Context){
-	c.HTML(http.StatusOK, "reservations.html", gin.H{
+	Render(c, http.StatusOK, "reservations.html", gin.H{
 		"title": "Login",
 	})
 }

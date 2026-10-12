@@ -7,7 +7,7 @@ import (
 )
 
 func GetSearchPage(c *gin.Context){
-	c.HTML(http.StatusOK, "search.html", gin.H{
+	Render(c, http.StatusOK, "search.html", gin.H{
 		"title": "Login",
 	})
 }

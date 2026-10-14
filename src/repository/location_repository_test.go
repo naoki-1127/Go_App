@@ -11,9 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRegistLocation(t *testing.T) {
+func TestRegister(t *testing.T) {
 	address := "岐阜県岐阜市1-2-3"
-	q := sqlc.New(testPool)
 	arg := sqlc.RegistLocationParams{
 		Name:     "サンプル",
 		Address:  &address,
@@ -27,7 +26,8 @@ func TestRegistLocation(t *testing.T) {
 			Valid:        true,
 		},
 	}
-	location, err := q.RegistLocation(context.Background(), arg)
+	q := NewPgLocationRepository(testPool)
+	location, err := q.Create(context.Background(), arg)
 	require.NoError(t, err)
-	assert.Equal(t, location, location)
+	assert.Equal(t, location.Name, "サンプル")
 }
